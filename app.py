@@ -3,7 +3,7 @@ import os
 import shutil
 from huggingface_hub import snapshot_download, login
 
-from langchain_community.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate

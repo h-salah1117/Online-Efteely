@@ -5,58 +5,66 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 import os
+import shutil
+from huggingface_hub import snapshot_download
 
-# Page configuration
+# ====================== PAGE CONFIG ======================
 st.set_page_config(
-    page_title="Efteely - Islamic Chatbot",
+    page_title="إفتيلي - Islamic Chatbot",
     page_icon="🕌",
-    layout="centered",
-    initial_sidebar_state="collapsed"
+    layout="centered"
 )
 
 st.title("🕌 إفتيلي - Islamic Chatbot")
 st.caption("اسأل أي سؤال فقهي وهجاوبك من فتاوى موثوقة")
 
-# Load RAG components with caching (important for performance)
+# ====================== DOWNLOAD CHROMA DB ======================
 @st.cache_resource
-def load_rag():
-    # Use the SAME embedding model that was used during indexing
+def download_and_load_chroma():
+    chroma_path = "./chroma_db"
+    
+    if not os.path.exists(chroma_path) or len(os.listdir(chroma_path)) < 3:
+        st.info("جاري تحميل قاعدة البيانات لأول مرة... (ده هياخد دقايق)")
+        with st.spinner("Downloading chroma_db from Hugging Face (817MB)..."):
+            snapshot_download(
+                repo_id="H-Salah/online-efteely-chroma",
+                repo_type="dataset",
+                local_dir=chroma_path,
+                allow_patterns=["*"]
+            )
+        st.success("✅ تم تحميل قاعدة البيانات بنجاح!")
+    
+    # Load embeddings - MUST match the one used during indexing
     embeddings = HuggingFaceEmbeddings(
-        model_name="intfloat/multilingual-e5-base",   # Must match your backup
+        model_name="intfloat/multilingual-e5-base",
         model_kwargs={'device': 'cpu'},
         encode_kwargs={'normalize_embeddings': True}
     )
     
-    # Load the chroma_db from your backup
-    if not os.path.exists("./chroma_db"):
-        st.error("chroma_db folder not found! Please make sure you extracted chroma_db_backup.zip")
-        st.stop()
-    
     vectorstore = Chroma(
-        persist_directory="./chroma_db",
+        persist_directory=chroma_path,
         embedding_function=embeddings
     )
     
     return vectorstore.as_retriever(search_kwargs={"k": 5})
 
-retriever = load_rag()
+retriever = download_and_load_chroma()
 
-# Initialize Groq LLM (fast + good free tier)
+# ====================== LLM ======================
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     temperature=0.25,
     groq_api_key=st.secrets.get("GROQ_API_KEY")
 )
 
-# Improved prompt for Islamic content
+# ====================== PROMPT ======================
 prompt_template = PromptTemplate.from_template("""
-You are a knowledgeable and trustworthy Islamic scholar.
-Answer the user's question in clear Arabic (use Fusha or simple Egyptian dialect when suitable).
-Use ONLY the provided fatwas as reference. Do not add external knowledge.
-Be concise, respectful, and accurate.
-If the provided context does not contain a direct answer, politely say so and suggest consulting a qualified scholar.
+You are a trusted Islamic scholar. 
+Answer in clear Arabic (Fusha or simple Egyptian dialect when suitable).
+Use ONLY the provided fatwas. Be concise, respectful, and accurate.
+If the context doesn't have a clear answer, say so politely.
 
-Context fatwas:
+Context:
 {context}
 
 Question: {question}
@@ -64,42 +72,37 @@ Question: {question}
 Answer:
 """)
 
-# Initialize chat history
+# ====================== CHAT HISTORY ======================
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display previous messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# User input
-if prompt := st.chat_input("اكتب سؤالك هنا... مثلاً: حكم صيام يوم الجمعة؟"):
-    
+# ====================== USER INPUT ======================
+if prompt := st.chat_input("اكتب سؤالك هنا..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("جاري البحث في الفتاوى وتوليد الإجابة..."):
-            
-            # Retrieve relevant fatwas
+        with st.spinner("جاري البحث في الفتاوى..."):
             docs = retriever.invoke(prompt)
             context = "\n\n---\n\n".join([doc.page_content for doc in docs])
             
-            # Generate answer
             chain = prompt_template | llm | StrOutputParser()
             response = chain.invoke({"context": context, "question": prompt})
             
             st.markdown(response)
             
-            # Show sources in expandable section
-            with st.expander("📚 المصادر المستخدمة"):
+            # Show sources
+            with st.expander("📚 المصادر"):
                 for i, doc in enumerate(docs, 1):
-                    source = doc.metadata.get("source", "Unknown Source")
+                    source = doc.metadata.get("source", "غير معروف")
                     link = doc.metadata.get("link", "")
-                    st.markdown(f"**{i}.** {source}")
+                    st.write(f"{i}. {source}")
                     if link:
-                        st.markdown(f"   🔗 [رابط الفتوى]({link})")
+                        st.write(f"   🔗 {link}")
 
     st.session_state.messages.append({"role": "assistant", "content": response})

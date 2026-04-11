@@ -93,20 +93,10 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
 
             st.markdown(response)
 
+            
+
             with st.expander("📚 المصادر"):
-                seen = set()
-                for i, doc in enumerate(docs):
-                    source = doc.metadata.get("source", "").strip()
-                    link = doc.metadata.get("link", "").strip()
-                    
-                    # امنع التكرار
-                    if source in seen:
-                        continue
-                    seen.add(source)
-                    
-                    st.write(f"**{i+1}.** {source if source else '⚠️ مصدر غير معروف'}")
-                    if link:
-                        st.markdown(f"[🔗 رابط الفتوى]({link})")
-                    st.divider()
+                # DEBUG - just for one doc
+                st.write("🔍 Metadata keys:", docs[0].metadata)
 
     st.session_state.messages.append({"role": "assistant", "content": response})

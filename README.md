@@ -1,6 +1,6 @@
 ---
 title: Online Efteely
-emoji: 🤖
+emoji: 🕌
 colorFrom: blue
 colorTo: purple
 sdk: streamlit

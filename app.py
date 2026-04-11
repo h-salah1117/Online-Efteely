@@ -7,132 +7,108 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
-st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
+# ====================== PAGE CONFIG ======================
+st.set_page_config(
+    page_title="Efteely أفتيلي",
+    page_icon="🕌",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
 
-# =====================
-# Custom CSS - matching offline UI
-# =====================
+# ====================== CUSTOM CSS (محسنة ومنظفة) ======================
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap');
 
-* {
-    font-family: 'Tajawal', sans-serif !important;
-    direction: rtl;
+* { font-family: 'Cairo', sans-serif !important; direction: rtl; }
+
+.stApp {
+    background: linear-gradient(135deg, #0a4d2e 0%, #0d6b3f 50%, #0f8a4f 100%);
 }
 
-/* Hide default streamlit elements */
-#MainMenu, footer, header {visibility: hidden;}
-.block-container {padding-top: 0 !important; max-width: 800px;}
+/* Hide default Streamlit elements */
+#MainMenu, footer, header { visibility: hidden !important; }
 
-/* ---- HEADER ---- */
+/* Main Container */
+.main .block-container {
+    max-width: 850px;
+    margin: 15px auto;
+    padding: 0 !important;
+}
+
+/* Header */
 .header-box {
     background: linear-gradient(135deg, #1a7a3c 0%, #25a550 60%, #2ecc71 100%);
-    border-radius: 18px 18px 0 0;
-    padding: 48px 32px 36px 32px;
+    border-radius: 20px 20px 0 0;
+    padding: 55px 30px 40px 30px;
     text-align: center;
-    margin-bottom: 0;
-    box-shadow: 0 4px 24px rgba(30,120,60,0.18);
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
 }
+
 .header-title {
-    font-size: 2.8rem;
-    font-weight: 800;
-    color: #e8f5e9;
-    letter-spacing: 2px;
-    margin-bottom: 10px;
-    text-shadow: 0 2px 12px rgba(0,0,0,0.18);
-}
-.header-subtitle {
-    font-size: 1.15rem;
-    color: #c8e6c9;
-    font-weight: 400;
-}
-
-/* ---- WARNING BOX ---- */
-.warning-box {
-    background: linear-gradient(90deg, #ff1a1a 0%, #cc0000 100%);
+    font-size: 2.9rem;
+    font-weight: 900;
     color: white;
-    border-radius: 10px;
-    padding: 18px 24px;
-    margin: 18px 0 10px 0;
-    font-size: 1.05rem;
+    margin-bottom: 8px;
+    text-shadow: 0 3px 15px rgba(0,0,0,0.3);
+}
+
+.header-subtitle {
+    font-size: 1.25rem;
+    color: #c8e6c9;
+    font-weight: 500;
+}
+
+/* Big Red Warning */
+.warning-box {
+    background: linear-gradient(135deg, #d32f2f, #b71c1c);
+    color: white;
+    border-radius: 16px;
+    padding: 22px 25px;
+    margin: 20px 0 25px 0;
+    font-size: 1.15rem;
     font-weight: 700;
+    line-height: 1.75;
     text-align: center;
-    line-height: 1.7;
-    box-shadow: 0 4px 18px rgba(200,0,0,0.25);
-    border: 2px solid #ff4444;
-    animation: pulse-border 2s infinite;
-}
-@keyframes pulse-border {
-    0%, 100% { box-shadow: 0 4px 18px rgba(200,0,0,0.25); }
-    50% { box-shadow: 0 4px 32px rgba(200,0,0,0.55); }
+    box-shadow: 0 6px 20px rgba(211, 47, 47, 0.4);
+    border: 3px solid #ff5252;
 }
 
-/* ---- CHAT AREA ---- */
-.chat-container {
-    background: #f7f7f7;
-    border-radius: 0 0 18px 18px;
-    padding: 28px 24px 24px 24px;
-    min-height: 200px;
+/* Chat Area */
+.chat-area {
+    background: #ffffff;
+    border-radius: 0 0 20px 20px;
+    padding: 30px 25px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.15);
 }
 
-/* ---- MESSAGES ---- */
-.stChatMessage {
-    border-radius: 14px !important;
-    margin-bottom: 12px !important;
-}
-[data-testid="stChatMessageContent"] {
-    font-size: 1.05rem !important;
-    line-height: 1.8 !important;
-}
-
-/* ---- INPUT BOX ---- */
+/* Input Box */
 .stChatInputContainer {
     background: white !important;
-    border-radius: 12px !important;
     border: 2px solid #25a550 !important;
-    padding: 4px !important;
-    margin-top: 12px !important;
-}
-.stChatInputContainer textarea {
-    font-family: 'Tajawal', sans-serif !important;
-    font-size: 1.05rem !important;
-    direction: rtl !important;
+    border-radius: 15px !important;
+    padding: 5px !important;
 }
 
-/* ---- SEND BUTTON ---- */
+.stChatInputContainer textarea {
+    font-size: 1.1rem !important;
+    padding: 15px 20px !important;
+}
+
+/* Send Button */
 .stChatInputContainer button {
     background: #25a550 !important;
-    border-radius: 10px !important;
     color: white !important;
+    border-radius: 12px !important;
 }
+
 .stChatInputContainer button:hover {
     background: #1a7a3c !important;
-}
-
-/* ---- SOURCE EXPANDER ---- */
-.streamlit-expanderHeader {
-    font-family: 'Tajawal', sans-serif !important;
-    color: #25a550 !important;
-    font-weight: 700 !important;
-    direction: rtl !important;
-}
-
-/* ---- SPINNER / INFO ---- */
-.stSpinner > div {
-    border-top-color: #25a550 !important;
-}
-.stAlert {
-    border-radius: 10px !important;
-    direction: rtl !important;
-    font-family: 'Tajawal', sans-serif !important;
 }
 </style>
 """, unsafe_allow_html=True)
 
-# =====================
-# Header
-# =====================
+# ====================== HEADER ======================
 st.markdown("""
 <div class="header-box">
     <div class="header-title">🕌 Efteely أفتيلي</div>
@@ -140,90 +116,69 @@ st.markdown("""
 </div>
 """, unsafe_allow_html=True)
 
-# =====================
-# Warning
-# =====================
+# ====================== LARGE RED WARNING ======================
 st.markdown("""
 <div class="warning-box">
-    ⚠️ تحذير هام ⚠️<br>
-    هذا المشروع تم لغرض التعلم فقط، فلا يجب الاعتماد على أي من هذه الفتاوى في أمورك الدينية لأن الموديل قد يخطئ
+    ⚠️ <strong>تحذير هام جداً</strong> ⚠️<br><br>
+    هذا المشروع تم لأغراض التعلم فقط.<br>
+    فلا يجب الاعتماد على أي من هذه الفتاوى في أمورك الدينية<br>
+    لأن الموديل قد يخطئ أو يعطي معلومات غير دقيقة.<br>
+    <strong>يرجى استشارة عالم دين موثوق في كل الأمور الشرعية.</strong>
 </div>
 """, unsafe_allow_html=True)
 
-# =====================
-# Backend
-# =====================
-CHROMA_PATH = "/tmp/chroma_db"
-CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")
-DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, ".download_complete")
+# ====================== RAG LOADING ======================
+CHROMA_PATH = "./chroma_db"
 
-@st.cache_resource(show_spinner=True)
+@st.cache_resource(show_spinner="جاري تحميل قاعدة الفتاوى...")
 def load_rag():
-    if not os.path.exists(DOWNLOAD_MARKER):
-        os.makedirs(CHROMA_PATH, exist_ok=True)
-        with st.spinner("جاري تحميل قاعدة الفتاوى... هياخد شوية وقت في أول مرة"):
-            snapshot_download(
-                repo_id="H-Salah/online-efteely-chroma",
-                repo_type="dataset",
-                local_dir=CHROMA_PATH,
-                allow_patterns=["chroma_db/*"],
-                token=st.secrets.get("HF_TOKEN", None)
-            )
-        with open(DOWNLOAD_MARKER, "w") as f:
-            f.write("done")
-
+    if not os.path.exists(CHROMA_PATH) or len(os.listdir(CHROMA_PATH)) < 5:
+        snapshot_download(
+            repo_id="H-Salah/online-efteely-chroma",
+            repo_type="dataset",
+            local_dir=CHROMA_PATH,
+            allow_patterns=["*"]
+        )
+    
     embeddings = HuggingFaceEmbeddings(
         model_name="intfloat/multilingual-e5-base",
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True}
     )
+    
+    vectorstore = Chroma(persist_directory=CHROMA_PATH, embedding_function=embeddings)
+    return vectorstore.as_retriever(search_kwargs={"k": 5})
 
-    vectorstore = Chroma(
-        persist_directory=CHROMA_SUBDIR,
-        embedding_function=embeddings
-    )
+retriever = load_rag()
 
-    count = vectorstore._collection.count()
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    st.info(f"✅ تم تحميل {count} فتوى")
-    return retriever
-
-try:
-    retriever = load_rag()
-except Exception as e:
-    st.error(f"❌ خطأ في تحميل قاعدة البيانات: {e}")
-    st.stop()
-
+# ====================== LLM ======================
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     temperature=0.25,
-    groq_api_key=st.secrets["GROQ_API_KEY"]
+    groq_api_key=st.secrets.get("GROQ_API_KEY")
 )
 
-prompt_template = PromptTemplate.from_template("""أنت مفتي وخبير شرعي موثوق. أجب على سؤال المستخدم بالعربية الفصحى الواضحة.
-استخدم فقط الفتاوى المقدمة في السياق. كن موجزاً ومحترماً.
-إذا لم يكن السؤال في السياق، قل ذلك بأدب.
+prompt_template = PromptTemplate.from_template("""
+أنت مفتي إسلامي موثوق. أجب على السؤال بالعربية بوضوح واختصار باستخدام الفتاوى المقدمة فقط.
+كن محترماً ودقيقاً.
 
 السياق:
 {context}
 
 السؤال: {question}
 
-الإجابة:""")
+الإجابة:
+""")
 
-# =====================
-# Chat
-# =====================
+# ====================== CHAT INTERFACE ======================
+st.markdown('<div class="chat-area">', unsafe_allow_html=True)
+
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
-        if msg["role"] == "assistant" and msg.get("sources"):
-            with st.expander("📚 المصادر"):
-                for i, url in enumerate(msg["sources"]):
-                    st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
 
 if prompt := st.chat_input("اكتب سؤالك الشرعي هنا..."):
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -234,30 +189,21 @@ if prompt := st.chat_input("اكتب سؤالك الشرعي هنا..."):
         with st.spinner("جاري البحث في الفتاوى..."):
             docs = retriever.invoke(prompt)
             context = "\n\n---\n\n".join([doc.page_content for doc in docs])
-
+            
             chain = prompt_template | llm | StrOutputParser()
             response = chain.invoke({"context": context, "question": prompt})
-
+            
             st.markdown(response)
+            
+            # Sources
+            with st.expander("📚 عرض المصادر والفتاوى الأصلية"):
+                for i, doc in enumerate(docs, 1):
+                    st.markdown(f"**{i}.** {doc.metadata.get('source', 'غير معروف')}")
+                    if doc.metadata.get("link"):
+                        st.markdown(f"[🔗 رابط الفتوى]({doc.metadata['link']})")
+                    st.write(doc.page_content)
+                    st.divider()
 
-            # Collect unique sources
-            seen = set()
-            sources = []
-            for doc in docs:
-                link = doc.metadata.get("link", "").strip()
-                source = doc.metadata.get("source", "").strip()
-                url = link or source
-                if url and url not in seen:
-                    seen.add(url)
-                    sources.append(url)
+    st.session_state.messages.append({"role": "assistant", "content": response})
 
-            if sources:
-                with st.expander("📚 المصادر"):
-                    for i, url in enumerate(sources):
-                        st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
-
-    st.session_state.messages.append({
-        "role": "assistant",
-        "content": response,
-        "sources": sources
-    })
+st.markdown('</div>', unsafe_allow_html=True)

@@ -11,24 +11,22 @@ st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered
 st.title("🕌 إفتيلي - Islamic Chatbot")
 st.caption("اسأل أي سؤال فقهي")
 
-# Use /tmp for writable storage on HuggingFace Spaces
 CHROMA_PATH = "/tmp/chroma_db"
-DOWNLOAD_MARKER = "/tmp/chroma_db/.download_complete"
+CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")
+DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, ".download_complete")
 
 @st.cache_resource(show_spinner=True)
 def load_rag():
-    # Check if already fully downloaded using a marker file
     if not os.path.exists(DOWNLOAD_MARKER):
         os.makedirs(CHROMA_PATH, exist_ok=True)
-        with st.spinner("جاري تحميل قاعدة الفتاوى (988MB)... هياخد شوية وقت في أول مرة"):
+        with st.spinner("جاري تحميل قاعدة الفتاوى... هياخد شوية وقت في أول مرة"):
             snapshot_download(
                 repo_id="H-Salah/online-efteely-chroma",
                 repo_type="dataset",
                 local_dir=CHROMA_PATH,
-                allow_patterns=["*"],
-                token=st.secrets.get("HF_TOKEN", None)  # Add HF_TOKEN to secrets
+                allow_patterns=["chroma_db/*"],
+                token=st.secrets.get("HF_TOKEN", None)
             )
-        # Write marker only after successful download
         with open(DOWNLOAD_MARKER, "w") as f:
             f.write("done")
         st.success("✅ تم تحميل قاعدة البيانات!")
@@ -40,12 +38,12 @@ def load_rag():
     )
 
     vectorstore = Chroma(
-        persist_directory=CHROMA_PATH,
+        persist_directory=CHROMA_SUBDIR,
         embedding_function=embeddings
     )
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
 
     count = vectorstore._collection.count()
+    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
     st.info(f"✅ تم تحميل {count} فتوى")
     return retriever
 
@@ -61,15 +59,16 @@ llm = ChatGroq(
     groq_api_key=st.secrets["GROQ_API_KEY"]
 )
 
-prompt_template = PromptTemplate.from_template("""You are a trusted Islamic scholar. Answer in clear Arabic.
-Use ONLY the provided fatwas. Be concise and respectful.
+prompt_template = PromptTemplate.from_template("""أنت مفتي وخبير شرعي موثوق. أجب على سؤال المستخدم بالعربية الفصحى الواضحة.
+استخدم فقط الفتاوى المقدمة في السياق. كن موجزاً ومحترماً.
+إذا لم يكن السؤال في السياق، قل ذلك بأدب.
 
-Context:
+السياق:
 {context}
 
-Question: {question}
+السؤال: {question}
 
-Answer:""")
+الإجابة:""")
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -93,10 +92,17 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
 
             st.markdown(response)
 
-            
-
             with st.expander("📚 المصادر"):
-                # DEBUG - just for one doc
-                st.write("🔍 Metadata keys:", docs[0].metadata)
+                seen = set()
+                for i, doc in enumerate(docs):
+                    link = doc.metadata.get("link", "").strip()
+                    source = doc.metadata.get("source", "").strip()
+                    url = link or source
+
+                    if not url or url in seen:
+                        continue
+                    seen.add(url)
+
+                    st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
 
     st.session_state.messages.append({"role": "assistant", "content": response})

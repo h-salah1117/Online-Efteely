@@ -23,19 +23,24 @@ st.markdown("""
         100% { background-position: 0% 50%; }
     }
     .block-container {
-        background: rgba(255, 255, 255, 0.98);
-        padding: 3rem !important;
+        background-color: #ffffff;
+        padding: 2rem !important;
         border-radius: 24px;
         box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        margin-top: 50px;
+        margin-top: 30px;
     }
     h1, h2, h3, p, span, div, button {
         font-family: 'Cairo', sans-serif !important;
+        color: #1e1e1e !important;
     }
     .stChatMessage {
-        background-color: #f1f8f5 !important;
+        background-color: #f8f9fa !important;
+        border: 1px solid #dee2e6 !important;
         border-radius: 15px !important;
-        border: 1px solid #e0eadd !important;
+        color: #1e1e1e !important;
+    }
+    .stChatMessage p {
+        color: #1e1e1e !important;
     }
     .stButton>button {
         width: 100%;
@@ -43,19 +48,17 @@ st.markdown("""
         color: white !important;
         border-radius: 12px;
         border: none;
-        transition: 0.3s;
     }
-    .stButton>button:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(15, 138, 79, 0.4);
+    .stChatInput textarea {
+        color: #1e1e1e !important;
     }
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown("""
-    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #0d6b3f 0%, #0f8a4f 100%); border-radius: 20px; color: white; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
-        <h1 style="color: white !important; margin: 0; font-size: 3em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">إفتيلي</h1>
-        <p style="opacity: 0.9; font-size: 1.2em; margin-top: 10px;">الإجابة على الأسئلة الشرعية بالذكاء الاصطناعي</p>
+    <div style="text-align: center; padding: 25px; background: #0d6b3f; border-radius: 20px; color: white; margin-bottom: 20px;">
+        <h1 style="color: white !important; margin: 0; font-size: 2.5em;">إفتيلي</h1>
+        <p style="color: white !important; opacity: 0.9; font-size: 1.1em; margin-top: 5px;">الإجابة على الأسئلة الشرعية بالذكاء الاصطناعي</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -130,9 +133,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
             with st.spinner("جاري مراجعة الفتاوى..."):
                 docs = retriever.invoke(search_query)
                 context = "\n\n---\n\n".join([doc.page_content for doc in docs])
-        else:
-            context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
-
+        
         prompt_template = PromptTemplate.from_template("""أنت "إفتيلي"، خبير شرعي ودود. أجب بناءً على تاريخ المحادثة والفتاوى المتاحة فقط.
         تاريخ المحادثة:
         {chat_history}

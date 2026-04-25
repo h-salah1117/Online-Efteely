@@ -15,21 +15,19 @@ CHROMA_PATH = "/tmp/chroma_db"
 CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")
 DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, ".download_complete")
 
-@st.cache_resource(show_spinner=True)
+@st.cache_resource(show_spinner=False) 
 def load_rag():
     if not os.path.exists(DOWNLOAD_MARKER):
         os.makedirs(CHROMA_PATH, exist_ok=True)
-        with st.spinner("جاري تحميل قاعدة الفتاوى... هياخد شوية وقت في أول مرة"):
-            snapshot_download(
-                repo_id="H-Salah/online-efteely-chroma",
-                repo_type="dataset",
-                local_dir=CHROMA_PATH,
-                allow_patterns=["chroma_db/*"],
-                token=st.secrets.get("HF_TOKEN", None)
-            )
+        snapshot_download(
+            repo_id="H-Salah/online-efteely-chroma",
+            repo_type="dataset",
+            local_dir=CHROMA_PATH,
+            allow_patterns=["chroma_db/*"],
+            token=st.secrets.get("HF_TOKEN", None)
+        )
         with open(DOWNLOAD_MARKER, "w") as f:
             f.write("done")
-        st.toast("✅ تم تحميل قاعدة البيانات!", icon="📚")
 
     embeddings = HuggingFaceEmbeddings(
         model_name="intfloat/multilingual-e5-base",
@@ -41,14 +39,14 @@ def load_rag():
         persist_directory=CHROMA_SUBDIR,
         embedding_function=embeddings
     )
-
-    count = vectorstore._collection.count()
+    
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    st.toast(f"✅ تم تحميل {count} فتوى", icon="📚")    
     return retriever
 
 try:
-    retriever = load_rag()
+    with st.spinner("جاري تشغيل محرك البحث..."):
+        retriever = load_rag()
+    st.toast("✅ تم تحميل قاعدة البيانات وجاهز للرد!", icon="📚")
 except Exception as e:
     st.error(f"❌ خطأ في تحميل قاعدة البيانات: {e}")
     st.stop()

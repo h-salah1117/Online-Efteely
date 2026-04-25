@@ -14,7 +14,6 @@ st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&display=swap');
 
-/* ── Root variables ── */
 :root {
     --green-deep:   #0d2b1f;
     --green-mid:    #14442e;
@@ -30,7 +29,6 @@ st.markdown("""
     --radius:       16px;
 }
 
-/* ── Global reset ── */
 html, body, [class*="css"] {
     font-family: 'Cairo', sans-serif !important;
     direction: rtl;
@@ -41,14 +39,12 @@ html, body, [class*="css"] {
     min-height: 100vh;
 }
 
-/* ── Hide Streamlit chrome ── */
 #MainMenu, footer, header { visibility: hidden; }
 .block-container {
     max-width: 760px;
     padding: 2rem 1.5rem 6rem;
 }
 
-/* ── Header ── */
 .efteely-header {
     text-align: center;
     padding: 2.5rem 1rem 1.5rem;
@@ -67,6 +63,7 @@ html, body, [class*="css"] {
     font-size: 0.95rem;
     color: var(--text-muted);
     font-weight: 300;
+    margin-top: 0.6rem;
 }
 .efteely-divider {
     width: 60px;
@@ -75,7 +72,6 @@ html, body, [class*="css"] {
     margin: 0.75rem auto 0;
 }
 
-/* ── Disclaimer banner ── */
 .disclaimer {
     background: linear-gradient(135deg, #fff8e6 0%, #fef3d0 100%);
     border: 1px solid var(--gold);
@@ -91,13 +87,11 @@ html, body, [class*="css"] {
     gap: 0.5rem;
 }
 
-/* ── Chat messages — nuclear override ── */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* Base container */
 [data-testid="stChatMessage"] {
     border-radius: var(--radius) !important;
     margin-bottom: 0.75rem !important;
@@ -108,7 +102,6 @@ html, body, [class*="css"] {
     background: #ffffff !important;
 }
 
-/* All text inside ANY chat bubble: dark by default */
 [data-testid="stChatMessage"] *,
 [data-testid="stChatMessage"] p,
 [data-testid="stChatMessage"] span,
@@ -117,20 +110,16 @@ html, body, [class*="css"] {
     background: transparent !important;
 }
 
-/* User bubble — green pill on the left side via left border */
-[data-testid="stChatMessage"][data-testid*="user"],
 div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-user"]) {
     background: #f0faf5 !important;
     border-left: 4px solid var(--green-accent) !important;
 }
 
-/* Assistant bubble */
 div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assistant"]) {
     background: #fffdf7 !important;
     border-left: 4px solid var(--gold) !important;
 }
 
-/* Avatar icons */
 [data-testid="chatAvatarIcon-user"] svg,
 [data-testid="chatAvatarIcon-user"] {
     background: var(--green-accent) !important;
@@ -144,7 +133,6 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
     fill: #fff !important;
 }
 
-/* ── Chat input ── */
 [data-testid="stChatInput"] {
     border-radius: 50px !important;
     border: 2px solid var(--green-accent) !important;
@@ -165,12 +153,10 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
     direction: rtl !important;
 }
 
-/* ── Spinner ── */
 [data-testid="stSpinner"] {
     color: var(--green-accent) !important;
 }
 
-/* ── Expander (sources) ── */
 [data-testid="stExpander"] {
     border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
@@ -183,7 +169,6 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
     font-weight: 600 !important;
 }
 
-/* ── Source links ── */
 [data-testid="stExpander"] a {
     color: var(--green-accent) !important;
     text-decoration: none !important;
@@ -197,28 +182,14 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
     color: var(--gold) !important;
 }
 
-/* ── Error ── */
 [data-testid="stAlert"] {
     border-radius: var(--radius) !important;
     border: none !important;
 }
 
-/* ── Scrollbar ── */
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--green-accent); border-radius: 2px; }
-
-/* ── Loading state ── */
-.loading-dot {
-    display: inline-block;
-    animation: blink 1.4s infinite both;
-}
-.loading-dot:nth-child(2) { animation-delay: 0.2s; }
-.loading-dot:nth-child(3) { animation-delay: 0.4s; }
-@keyframes blink {
-    0%, 80%, 100% { opacity: 0; }
-    40% { opacity: 1; }
-}
 </style>
 
 <!-- Header -->
@@ -235,8 +206,8 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
 """, unsafe_allow_html=True)
 
 # ── Constants ────────────────────────────────────────────────────────────────
-CHROMA_PATH    = "/tmp/chroma_db"
-CHROMA_SUBDIR  = os.path.join(CHROMA_PATH, "chroma_db")
+CHROMA_PATH     = "/tmp/chroma_db"
+CHROMA_SUBDIR   = os.path.join(CHROMA_PATH, "chroma_db")
 DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, ".download_complete")
 
 # ── Load RAG ─────────────────────────────────────────────────────────────────
@@ -273,11 +244,26 @@ except Exception as e:
     st.stop()
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
+# FIX 1: validate secret exists before crashing with an unclear KeyError
+if "GROQ_API_KEY" not in st.secrets:
+    st.error("❌ GROQ_API_KEY مش موجود في الـ secrets — تأكد إنك أضفته في إعدادات المساحة")
+    st.stop()
+
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     temperature=0.1,
     groq_api_key=st.secrets["GROQ_API_KEY"]
 )
+
+# FIX 2: build prompt chain once at startup, not on every request
+prompt_template = PromptTemplate.from_template(
+    'أنت "إفتيلي"، خبير شرعي ودود ومتخصص. أجب بناءً على تاريخ المحادثة والفتاوى المتاحة فقط.\n'
+    'تاريخ المحادثة:\n{chat_history}\n\n'
+    'الفتاوى المتاحة:\n{context}\n\n'
+    'السؤال الحالي: {question}\n\n'
+    'إجابة إفتيلي:'
+)
+chain = prompt_template | llm | StrOutputParser()
 
 # ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
@@ -313,7 +299,13 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
         context = ""
         docs    = []
 
-        if "search" in intent_result:
+        # FIX 3: improved fallback — short greetings still go through chat path,
+        # but anything that looks like a question defaults to search
+        use_search = "search" in intent_result or (
+            "chat" not in intent_result and len(prompt.split()) > 3
+        )
+
+        if use_search:
             search_query = f"{full_history}\nQuestion: {prompt}"
             with st.spinner("جاري مراجعة الفتاوى…"):
                 docs    = retriever.invoke(search_query)
@@ -321,20 +313,6 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
         else:
             context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
 
-        prompt_template = PromptTemplate.from_template(
-            """أنت "إفتيلي"، خبير شرعي ودود ومتخصص. أجب بناءً على تاريخ المحادثة والفتاوى المتاحة فقط.
-تاريخ المحادثة:
-{chat_history}
-
-الفتاوى المتاحة:
-{context}
-
-السؤال الحالي: {question}
-
-إجابة إفتيلي:"""
-        )
-
-        chain    = prompt_template | llm | StrOutputParser()
         response = chain.invoke({
             "context":      context,
             "question":     prompt,
@@ -344,7 +322,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
         st.markdown(response)
 
         # Sources expander
-        if "search" in intent_result and docs:
+        if use_search and docs:
             with st.expander("📚 المصادر والمراجع"):
                 urls = set()
                 for doc in docs:
@@ -353,5 +331,5 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
                         st.markdown(f"- [رابط الفتوى ↗]({u})")
                         urls.add(u)
 
+    # FIX 4: removed st.rerun() — Streamlit reruns automatically after each interaction
     st.session_state.messages.append({"role": "assistant", "content": response})
-    st.rerun()

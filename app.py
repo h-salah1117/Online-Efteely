@@ -9,44 +9,225 @@ from langchain_core.output_parsers import StrOutputParser
 
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
+# ── Custom CSS ──────────────────────────────────────────────────────────────
 st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
-    <style>
-    html, body, [class*="st-"] {
-        font-family: 'Cairo', sans-serif;
-    }
-    .main-header {
-        text-align: center;
-        padding: 2rem;
-        background-color: #0d6b3f;
-        border-radius: 15px;
-        color: white;
-        margin-bottom: 2rem;
-    }
-    .stChatMessage {
-        border-radius: 10px;
-        padding: 10px;
-        margin-bottom: 5px;
-    }
-    footer {visibility: hidden;}
-    #MainMenu {visibility: hidden;}
-    </style>
-    """, unsafe_allow_html=True)
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=Cairo:wght@300;400;600;700&display=swap');
 
-st.markdown("""
-    <div class="main-header">
-        <h1 style="color: white !important;">🕌 إفتيلي</h1>
-        <p style="font-size: 1.2rem; opacity: 0.9;">مساعدك الذكي للإجابة على الأسئلة الشرعية</p>
-    </div>
-    """, unsafe_allow_html=True)
+/* ── Root variables ── */
+:root {
+    --green-deep:   #0d2b1f;
+    --green-mid:    #14442e;
+    --green-accent: #1e7a4a;
+    --green-light:  #2aad6a;
+    --gold:         #c9a84c;
+    --gold-light:   #e5c97e;
+    --cream:        #f7f3eb;
+    --text-main:    #1a1a1a;
+    --text-muted:   #5a6b62;
+    --border:       rgba(200,168,76,0.25);
+    --shadow:       0 4px 24px rgba(13,43,31,0.10);
+    --radius:       16px;
+}
 
-st.warning("⚠️ البوت معمول لغرض تعليمي فقط لا تعتمد عليه في أمورك الدينية❌")
+/* ── Global reset ── */
+html, body, [class*="css"] {
+    font-family: 'Cairo', sans-serif !important;
+    direction: rtl;
+}
 
-CHROMA_PATH = "/tmp/chroma_db"
-CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")
+.stApp {
+    background: var(--cream);
+    min-height: 100vh;
+}
+
+/* ── Hide Streamlit chrome ── */
+#MainMenu, footer, header { visibility: hidden; }
+.block-container {
+    max-width: 760px;
+    padding: 2rem 1.5rem 6rem;
+}
+
+/* ── Header ── */
+.efteely-header {
+    text-align: center;
+    padding: 2.5rem 1rem 1.5rem;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 1.5rem;
+}
+.efteely-logo {
+    font-family: 'Amiri', serif;
+    font-size: 3rem;
+    color: var(--green-mid);
+    line-height: 1;
+    margin-bottom: 0.25rem;
+    letter-spacing: 2px;
+}
+.efteely-subtitle {
+    font-size: 0.95rem;
+    color: var(--text-muted);
+    font-weight: 300;
+}
+.efteely-divider {
+    width: 60px;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+    margin: 0.75rem auto 0;
+}
+
+/* ── Disclaimer banner ── */
+.disclaimer {
+    background: linear-gradient(135deg, #fff8e6 0%, #fef3d0 100%);
+    border: 1px solid var(--gold);
+    border-radius: var(--radius);
+    padding: 0.75rem 1.25rem;
+    margin-bottom: 1.5rem;
+    font-size: 0.85rem;
+    color: #7a5c00;
+    text-align: center;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+}
+
+/* ── Chat messages ── */
+[data-testid="stChatMessage"] {
+    border-radius: var(--radius) !important;
+    margin-bottom: 0.75rem !important;
+    padding: 1rem 1.25rem !important;
+    box-shadow: var(--shadow) !important;
+    border: 1px solid transparent !important;
+    animation: fadeUp 0.3s ease both;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* User bubble */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
+    background: linear-gradient(135deg, var(--green-mid), var(--green-accent)) !important;
+    border-color: var(--green-light) !important;
+    color: #ffffff !important;
+}
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) p {
+    color: #ffffff !important;
+}
+
+/* Assistant bubble */
+[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
+    background: #ffffff !important;
+    border-color: var(--border) !important;
+    color: var(--text-main) !important;
+}
+
+/* Avatar icons */
+[data-testid="chatAvatarIcon-user"] {
+    background: var(--green-light) !important;
+}
+[data-testid="chatAvatarIcon-assistant"] {
+    background: var(--gold) !important;
+}
+
+/* ── Chat input ── */
+[data-testid="stChatInput"] {
+    border-radius: 50px !important;
+    border: 2px solid var(--green-accent) !important;
+    background: #ffffff !important;
+    box-shadow: 0 4px 20px rgba(30,122,74,0.12) !important;
+    padding: 0.5rem 1.25rem !important;
+    font-family: 'Cairo', sans-serif !important;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+[data-testid="stChatInput"]:focus-within {
+    border-color: var(--gold) !important;
+    box-shadow: 0 4px 24px rgba(201,168,76,0.2) !important;
+}
+[data-testid="stChatInput"] textarea {
+    font-family: 'Cairo', sans-serif !important;
+    font-size: 1rem !important;
+    color: var(--text-main) !important;
+    direction: rtl !important;
+}
+
+/* ── Spinner ── */
+[data-testid="stSpinner"] {
+    color: var(--green-accent) !important;
+}
+
+/* ── Expander (sources) ── */
+[data-testid="stExpander"] {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    background: #fafaf8 !important;
+    margin-top: 0.5rem !important;
+}
+[data-testid="stExpander"] summary {
+    font-size: 0.85rem !important;
+    color: var(--text-muted) !important;
+    font-weight: 600 !important;
+}
+
+/* ── Source links ── */
+[data-testid="stExpander"] a {
+    color: var(--green-accent) !important;
+    text-decoration: none !important;
+    font-size: 0.875rem;
+    padding: 4px 0;
+    display: inline-block;
+    border-bottom: 1px dashed var(--border);
+    transition: color 0.2s ease;
+}
+[data-testid="stExpander"] a:hover {
+    color: var(--gold) !important;
+}
+
+/* ── Error ── */
+[data-testid="stAlert"] {
+    border-radius: var(--radius) !important;
+    border: none !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--green-accent); border-radius: 2px; }
+
+/* ── Loading state ── */
+.loading-dot {
+    display: inline-block;
+    animation: blink 1.4s infinite both;
+}
+.loading-dot:nth-child(2) { animation-delay: 0.2s; }
+.loading-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes blink {
+    0%, 80%, 100% { opacity: 0; }
+    40% { opacity: 1; }
+}
+</style>
+
+<!-- Header -->
+<div class="efteely-header">
+    <div class="efteely-logo">🕌 إفتيلي</div>
+    <div class="efteely-subtitle">مساعدك الفقهي الذكي — اسأل بكل ثقة</div>
+    <div class="efteely-divider"></div>
+</div>
+
+<!-- Disclaimer -->
+<div class="disclaimer">
+    ⚠️ هذا البوت لأغراض تعليمية فقط · لا تعتمد عليه في مسائلك الدينية دون الرجوع لأهل العلم
+</div>
+""", unsafe_allow_html=True)
+
+# ── Constants ────────────────────────────────────────────────────────────────
+CHROMA_PATH    = "/tmp/chroma_db"
+CHROMA_SUBDIR  = os.path.join(CHROMA_PATH, "chroma_db")
 DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, ".download_complete")
 
-@st.cache_resource(show_spinner=False) 
+# ── Load RAG ─────────────────────────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
 def load_rag():
     if not os.path.exists(DOWNLOAD_MARKER):
         os.makedirs(CHROMA_PATH, exist_ok=True)
@@ -59,73 +240,105 @@ def load_rag():
         )
         with open(DOWNLOAD_MARKER, "w") as f:
             f.write("done")
+
     embeddings = HuggingFaceEmbeddings(
         model_name="intfloat/multilingual-e5-base",
         model_kwargs={"device": "cpu"},
         encode_kwargs={"normalize_embeddings": True}
     )
-    vectorstore = Chroma(persist_directory=CHROMA_SUBDIR, embedding_function=embeddings)
+    vectorstore = Chroma(
+        persist_directory=CHROMA_SUBDIR,
+        embedding_function=embeddings
+    )
     return vectorstore.as_retriever(search_kwargs={"k": 5})
 
 try:
-    with st.spinner("جاري التحميل..."):
+    with st.spinner("جاري تحميل محرك البحث الفقهي…"):
         retriever = load_rag()
 except Exception as e:
-    st.error(f"❌ خطأ: {e}")
+    st.error(f"❌ خطأ في تشغيل النظام: {e}")
     st.stop()
 
+# ── LLM ──────────────────────────────────────────────────────────────────────
 llm = ChatGroq(
     model="llama-3.3-70b-versatile",
     temperature=0.1,
     groq_api_key=st.secrets["GROQ_API_KEY"]
 )
 
+# ── Session state ─────────────────────────────────────────────────────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
+    st.toast("✅ إفتيلي جاهز للرد على استفساراتكم", icon="🕌")
 
+# ── Render history ────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-if prompt := st.chat_input("اكتب سؤالك هنا..."):
+# ── Handle new input ──────────────────────────────────────────────────────────
+if prompt := st.chat_input("اكتب سؤالك هنا…"):
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    history_text = "\n".join([f"{'المستخدم' if m['role']=='user' else 'إفتيلي'}: {m['content']}" for m in st.session_state.messages[-5:]])
+    # Build conversation history (last 6 turns)
+    history_lines = []
+    for m in st.session_state.messages[-6:]:
+        role = "المستخدم" if m["role"] == "user" else "إفتيلي"
+        history_lines.append(f"{role}: {m['content']}")
+    full_history = "\n".join(history_lines)
 
     with st.chat_message("assistant"):
-        intent_query = f"Conversation:\n{history_text}\nLast message: {prompt}\nIs this a specific religious question? Answer 'search' or 'chat' only."
-        intent = llm.invoke(intent_query).content.strip().lower()
+        # Intent detection
+        intent_query = (
+            f"Based on the conversation history:\n{full_history}\n"
+            "Is the last message a specific religious question? Answer 'search' or 'chat'."
+        )
+        intent_result = llm.invoke(intent_query).content.strip().lower()
 
         context = ""
-        docs = []
-        if "search" in intent:
-            with st.spinner("جاري مراجعة المصادر..."):
-                docs = retriever.invoke(f"{history_text}\n{prompt}")
-                context = "\n\n---\n\n".join([d.page_content for d in docs])
+        docs    = []
 
-        prompt_template = PromptTemplate.from_template("""أنت "إفتيلي"، خبير شرعي ومساعد ذكي.
-        أجب بلباقة بناءً على تاريخ المحادثة والفتاوى المتاحة.
-        
-        التاريخ: {chat_history}
-        السياق: {context}
-        السؤال: {question}
-        الإجابة:""")
+        if "search" in intent_result:
+            search_query = f"{full_history}\nQuestion: {prompt}"
+            with st.spinner("جاري مراجعة الفتاوى…"):
+                docs    = retriever.invoke(search_query)
+                context = "\n\n---\n\n".join([doc.page_content for doc in docs])
+        else:
+            context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
 
-        response = (prompt_template | llm | StrOutputParser()).invoke({
-            "context": context,
-            "question": prompt,
-            "chat_history": history_text
+        prompt_template = PromptTemplate.from_template(
+            """أنت "إفتيلي"، خبير شرعي ودود ومتخصص. أجب بناءً على تاريخ المحادثة والفتاوى المتاحة فقط.
+تاريخ المحادثة:
+{chat_history}
+
+الفتاوى المتاحة:
+{context}
+
+السؤال الحالي: {question}
+
+إجابة إفتيلي:"""
+        )
+
+        chain    = prompt_template | llm | StrOutputParser()
+        response = chain.invoke({
+            "context":      context,
+            "question":     prompt,
+            "chat_history": full_history
         })
 
         st.markdown(response)
-        
-        if docs and "search" in intent:
-            with st.expander("📚 المصادر المعتمدة"):
-                urls = {d.metadata.get("link", d.metadata.get("source", "")) for d in docs}
-                for u in urls:
-                    if u: st.markdown(f"- [رابط الفتوى]({u})")
+
+        # Sources expander
+        if "search" in intent_result and docs:
+            with st.expander("📚 المصادر والمراجع"):
+                urls = set()
+                for doc in docs:
+                    u = doc.metadata.get("link", doc.metadata.get("source", "")).strip()
+                    if u and u not in urls:
+                        st.markdown(f"- [رابط الفتوى ↗]({u})")
+                        urls.add(u)
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     st.rerun()

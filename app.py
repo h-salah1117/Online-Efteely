@@ -9,7 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 st.title("🕌 إفتيلي - Islamic Chatbot")
-st.caption("اسأل أي سؤال فقهي")
+st.caption(" (البوت معمول لغرض تعليمي فقط لا تعتمد عليه في أمرك الدينية❌)اسأل أي سؤال فقهي")
 
 CHROMA_PATH = "/tmp/chroma_db"
 CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")
@@ -40,13 +40,11 @@ def load_rag():
         embedding_function=embeddings
     )
     
-    retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    return retriever
+    return vectorstore.as_retriever(search_kwargs={"k": 5})
 
 try:
     with st.spinner("جاري تشغيل محرك البحث..."):
         retriever = load_rag()
-    st.toast("✅ تم تحميل قاعدة البيانات وجاهز للرد!", icon="📚")
 except Exception as e:
     st.error(f"❌ خطأ في تحميل قاعدة البيانات: {e}")
     st.stop()
@@ -57,40 +55,30 @@ llm = ChatGroq(
     groq_api_key=st.secrets["GROQ_API_KEY"]
 )
 
-
-
-prompt_template = PromptTemplate.from_template("""أنت مفتي وخبير شرعي موثوق ومساعد ذكي.
-1. إذا كانت رسالة المستخدم مجرد تحية (مثل: سلام، أهلاً) أو كلام عام، رد عليه بلباقة ودوده وادعه لطرح سؤاله.
-2. إذا كان المستخدم يمهد لسؤال (مثل: عندي مشكلة، عايز استفسر)، طمنه واسأله عن التفاصيل.
-3. إذا كان المستخدم يطرح سؤالاً فقهياً واضحاً، استخدم الفتاوى المقدمة في "السياق" للإجابة بدقة, و إن لم يكن سؤال فقهي بل مجرد استفسار عام، استخدم معرفتك العامة للإجابة. و تعامل كأنك إنسان عادي يجيب على سؤال صديقه، لا تذكر أبداً أنك بوت أو تستخدم أي مصطلحات تقنية.
-
-سياق المحادثة السابقة:
-{chat_history}
-
-الفتاوى المستخرجة (استخدمها فقط إذا كان هناك سؤال فقهي):
-{context}
-
-سؤال المستخدم: {question}
-
-الإجابة:""")
-
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-chat_history_text = ""
-for msg in st.session_state.messages[-5:]: 
-    role = "المستخدم" if msg["role"] == "user" else "البوت"
-    chat_history_text += f"{role}: {msg['content']}\n"
+    st.toast("✅ تم تحميل قاعدة البيانات وجاهز للرد!", icon="📚")
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("اكتب سؤالك هنا..."):
+    st.session_state.messages.append({"role": "user", "content": prompt})
+    with st.chat_message("user"):
+        st.markdown(prompt)
+
+    chat_history_text = ""
+    for msg in st.session_state.messages[-6:-1]: 
+        role = "المستخدم" if msg["role"] == "user" else "إفتيلي"
+        chat_history_text += f"{role}: {msg['content']}\n"
 
     with st.chat_message("assistant"):
         check_prompt = f"Is the following user message a specific Islamic jurisprudence question that needs a fatwa search or just a greeting/general talk? Respond with 'search' or 'chat'. Message: {prompt}"
         intent = llm.invoke(check_prompt).content.strip().lower()
+
+        context = ""
+        docs = [] 
 
         if "search" in intent:
             with st.spinner("جاري البحث في قاعدة الفتاوى..."):
@@ -98,9 +86,23 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
                 context = "\n\n---\n\n".join([doc.page_content for doc in docs])
         else:
             context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
-            docs = [] 
 
-        
+        prompt_template = PromptTemplate.from_template("""أنت "إفتيلي"، خبير شرعي ومساعد ذكي بأسلوب ودود.
+        1. إذا كانت رسالة المستخدم تحية أو كلام عام، رد بلباقة وادعه لسؤالك.
+        2. ابدأ بالإجابة مباشرة دون مقدمات مكررة.
+        3. استخدم السياق فقط للأسئلة الفقهية الصريحة.
+        4. تعامل كإنسان عادي ولا تذكر أنك بوت.
+
+        سياق المحادثة السابقة:
+        {chat_history}
+
+        الفتاوى المستخرجة:
+        {context}
+
+        سؤال المستخدم: {question}
+
+        إجابة إفتيلي:""")
+
         chain = prompt_template | llm | StrOutputParser()
         response = chain.invoke({
             "context": context, 
@@ -110,15 +112,14 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
         
         st.markdown(response)
 
-        with st.expander("📚 المصادر"):
-            seen = set()
-            for i, doc in enumerate(docs):
-                link = doc.metadata.get("link", "").strip()
-                source = doc.metadata.get("source", "").strip()
-                url = link or source
-                if not url or url in seen:
-                    continue
-                seen.add(url)
-                st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
+        if docs:
+            with st.expander("📚 المصادر"):
+                seen = set()
+                for i, doc in enumerate(docs):
+                    url = doc.metadata.get("link", doc.metadata.get("source", "")).strip()
+                    if url and url not in seen:
+                        st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
+                        seen.add(url)
 
     st.session_state.messages.append({"role": "assistant", "content": response})
+    st.rerun()

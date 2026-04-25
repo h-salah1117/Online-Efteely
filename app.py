@@ -8,9 +8,58 @@ from langchain_core.prompts import PromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
-st.title("🕌 إفتيلي - Islamic Chatbot")
-st.caption("اسأل أي سؤال فقهي")
-st.warning("⚠️ البوت معمول لغرض تعليمي فقط لا تعتمد عليه في أمرك الدينية❌")
+
+st.markdown("""
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+    .stApp {
+        background: linear-gradient(135deg, #0a4d2e 0%, #0d6b3f 25%, #0f8a4f 50%, #0d6b3f 75%, #0a4d2e 100%);
+        background-size: 400% 400%;
+        animation: gradientShift 15s ease infinite;
+    }
+    @keyframes gradientShift {
+        0% { background-position: 0% 50%; }
+        50% { background-position: 100% 50%; }
+        100% { background-position: 0% 50%; }
+    }
+    .block-container {
+        background: rgba(255, 255, 255, 0.98);
+        padding: 3rem !important;
+        border-radius: 24px;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        margin-top: 50px;
+    }
+    h1, h2, h3, p, span, div, button {
+        font-family: 'Cairo', sans-serif !important;
+    }
+    .stChatMessage {
+        background-color: #f1f8f5 !important;
+        border-radius: 15px !important;
+        border: 1px solid #e0eadd !important;
+    }
+    .stButton>button {
+        width: 100%;
+        background: linear-gradient(135deg, #0f8a4f 0%, #0d6b3f 100%);
+        color: white !important;
+        border-radius: 12px;
+        border: none;
+        transition: 0.3s;
+    }
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 5px 15px rgba(15, 138, 79, 0.4);
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+st.markdown("""
+    <div style="text-align: center; padding: 30px; background: linear-gradient(135deg, #0d6b3f 0%, #0f8a4f 100%); border-radius: 20px; color: white; margin-bottom: 25px; box-shadow: 0 10px 20px rgba(0,0,0,0.2);">
+        <h1 style="color: white !important; margin: 0; font-size: 3em; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">إفتيلي</h1>
+        <p style="opacity: 0.9; font-size: 1.2em; margin-top: 10px;">الإجابة على الأسئلة الشرعية بالذكاء الاصطناعي</p>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.warning("⚠️ البوت معمول لغرض تعليمي فقط لا تعتمد عليه في أمورك الدينية❌")
 
 CHROMA_PATH = "/tmp/chroma_db"
 CHROMA_SUBDIR = os.path.join(CHROMA_PATH, "chroma_db")

@@ -87,31 +87,38 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 if prompt := st.chat_input("اكتب سؤالك هنا..."):
-    st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
 
     with st.chat_message("assistant"):
-        with st.spinner("جاري البحث..."):
-            docs = retriever.invoke(prompt)
-            context = "\n\n---\n\n".join([doc.page_content for doc in docs])
+        check_prompt = f"Is the following user message a specific Islamic jurisprudence question that needs a fatwa search or just a greeting/general talk? Respond with 'search' or 'chat'. Message: {prompt}"
+        intent = llm.invoke(check_prompt).content.strip().lower()
 
-            chain = prompt_template | llm | StrOutputParser()
-            response = chain.invoke({"context": context, "question": prompt, "chat_history": chat_history_text})
+        if "search" in intent:
+            with st.spinner("جاري البحث في قاعدة الفتاوى..."):
+                docs = retriever.invoke(prompt)
+                context = "\n\n---\n\n".join([doc.page_content for doc in docs])
+        else:
+            context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
+            docs = [] 
 
-            st.markdown(response)
+        
+        chain = prompt_template | llm | StrOutputParser()
+        response = chain.invoke({
+            "context": context, 
+            "question": prompt, 
+            "chat_history": chat_history_text
+        })
+        
+        st.markdown(response)
 
-            with st.expander("📚 المصادر"):
-                seen = set()
-                for i, doc in enumerate(docs):
-                    link = doc.metadata.get("link", "").strip()
-                    source = doc.metadata.get("source", "").strip()
-                    url = link or source
-
-                    if not url or url in seen:
-                        continue
-                    seen.add(url)
-
-                    st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
+        with st.expander("📚 المصادر"):
+            seen = set()
+            for i, doc in enumerate(docs):
+                link = doc.metadata.get("link", "").strip()
+                source = doc.metadata.get("source", "").strip()
+                url = link or source
+                if not url or url in seen:
+                    continue
+                seen.add(url)
+                st.markdown(f"**{i+1}.** [🔗 رابط الفتوى]({url})")
 
     st.session_state.messages.append({"role": "assistant", "content": response})

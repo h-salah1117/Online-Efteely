@@ -10,55 +10,33 @@ from langchain_core.output_parsers import StrOutputParser
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
 st.markdown("""
-    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;700&display=swap" rel="stylesheet">
     <style>
-    .stApp {
-        background: linear-gradient(135deg, #0a4d2e 0%, #0d6b3f 25%, #0f8a4f 50%, #0d6b3f 75%, #0a4d2e 100%);
-        background-size: 400% 400%;
-        animation: gradientShift 15s ease infinite;
+    html, body, [class*="st-"] {
+        font-family: 'Cairo', sans-serif;
     }
-    @keyframes gradientShift {
-        0% { background-position: 0% 50%; }
-        50% { background-position: 100% 50%; }
-        100% { background-position: 0% 50%; }
-    }
-    .block-container {
-        background-color: #ffffff;
-        padding: 2rem !important;
-        border-radius: 24px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
-        margin-top: 30px;
-    }
-    h1, h2, h3, p, span, div, button {
-        font-family: 'Cairo', sans-serif !important;
-        color: #1e1e1e !important;
+    .main-header {
+        text-align: center;
+        padding: 2rem;
+        background-color: #0d6b3f;
+        border-radius: 15px;
+        color: white;
+        margin-bottom: 2rem;
     }
     .stChatMessage {
-        background-color: #f8f9fa !important;
-        border: 1px solid #dee2e6 !important;
-        border-radius: 15px !important;
-        color: #1e1e1e !important;
+        border-radius: 10px;
+        padding: 10px;
+        margin-bottom: 5px;
     }
-    .stChatMessage p {
-        color: #1e1e1e !important;
-    }
-    .stButton>button {
-        width: 100%;
-        background: linear-gradient(135deg, #0f8a4f 0%, #0d6b3f 100%);
-        color: white !important;
-        border-radius: 12px;
-        border: none;
-    }
-    .stChatInput textarea {
-        color: #1e1e1e !important;
-    }
+    footer {visibility: hidden;}
+    #MainMenu {visibility: hidden;}
     </style>
     """, unsafe_allow_html=True)
 
 st.markdown("""
-    <div style="text-align: center; padding: 25px; background: #0d6b3f; border-radius: 20px; color: white; margin-bottom: 20px;">
-        <h1 style="color: white !important; margin: 0; font-size: 2.5em;">إفتيلي</h1>
-        <p style="color: white !important; opacity: 0.9; font-size: 1.1em; margin-top: 5px;">الإجابة على الأسئلة الشرعية بالذكاء الاصطناعي</p>
+    <div class="main-header">
+        <h1 style="color: white !important;">🕌 إفتيلي</h1>
+        <p style="font-size: 1.2rem; opacity: 0.9;">مساعدك الذكي للإجابة على الأسئلة الشرعية</p>
     </div>
     """, unsafe_allow_html=True)
 
@@ -90,7 +68,7 @@ def load_rag():
     return vectorstore.as_retriever(search_kwargs={"k": 5})
 
 try:
-    with st.spinner("جاري تشغيل محرك البحث..."):
+    with st.spinner("جاري التحميل..."):
         retriever = load_rag()
 except Exception as e:
     st.error(f"❌ خطأ: {e}")
@@ -104,7 +82,6 @@ llm = ChatGroq(
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
-    st.toast("✅ جاهز للرد على استفساراتكم", icon="🕌")
 
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
@@ -115,50 +92,40 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
     with st.chat_message("user"):
         st.markdown(prompt)
 
-    history_lines = []
-    for m in st.session_state.messages[-6:]:
-        role = "المستخدم" if m["role"] == "user" else "إفتيلي"
-        history_lines.append(f"{role}: {m['content']}")
-    full_history = "\n".join(history_lines)
+    history_text = "\n".join([f"{'المستخدم' if m['role']=='user' else 'إفتيلي'}: {m['content']}" for m in st.session_state.messages[-5:]])
 
     with st.chat_message("assistant"):
-        intent_query = f"Based on the conversation history:\n{full_history}\nIs the last message a specific religious question? Answer 'search' or 'chat'."
-        intent_result = llm.invoke(intent_query).content.strip().lower()
+        intent_query = f"Conversation:\n{history_text}\nLast message: {prompt}\nIs this a specific religious question? Answer 'search' or 'chat' only."
+        intent = llm.invoke(intent_query).content.strip().lower()
 
         context = ""
-        docs = [] 
-        
-        if "search" in intent_result:
-            search_query = f"{full_history}\nQuestion: {prompt}"
-            with st.spinner("جاري مراجعة الفتاوى..."):
-                docs = retriever.invoke(search_query)
-                context = "\n\n---\n\n".join([doc.page_content for doc in docs])
-        
-        prompt_template = PromptTemplate.from_template("""أنت "إفتيلي"، خبير شرعي ودود. أجب بناءً على تاريخ المحادثة والفتاوى المتاحة فقط.
-        تاريخ المحادثة:
-        {chat_history}
-        الفتاوى المتاحة:
-        {context}
-        السؤال الحالي: {question}
-        إجابة إفتيلي:""")
+        docs = []
+        if "search" in intent:
+            with st.spinner("جاري مراجعة المصادر..."):
+                docs = retriever.invoke(f"{history_text}\n{prompt}")
+                context = "\n\n---\n\n".join([d.page_content for d in docs])
 
-        chain = prompt_template | llm | StrOutputParser()
-        response = chain.invoke({
+        prompt_template = PromptTemplate.from_template("""أنت "إفتيلي"، خبير شرعي ومساعد ذكي.
+        أجب بلباقة بناءً على تاريخ المحادثة والفتاوى المتاحة.
+        
+        التاريخ: {chat_history}
+        السياق: {context}
+        السؤال: {question}
+        الإجابة:""")
+
+        response = (prompt_template | llm | StrOutputParser()).invoke({
             "context": context,
             "question": prompt,
-            "chat_history": full_history
+            "chat_history": history_text
         })
 
         st.markdown(response)
         
-        if "search" in intent_result and docs:
-            with st.expander("📚 المصادر"):
-                urls = set()
-                for doc in docs:
-                    u = doc.metadata.get("link", doc.metadata.get("source", "")).strip()
-                    if u and u not in urls:
-                        st.markdown(f"- [رابط الفتوى]({u})")
-                        urls.add(u)
+        if docs and "search" in intent:
+            with st.expander("📚 المصادر المعتمدة"):
+                urls = {d.metadata.get("link", d.metadata.get("source", "")) for d in docs}
+                for u in urls:
+                    if u: st.markdown(f"- [رابط الفتوى]({u})")
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     st.rerun()

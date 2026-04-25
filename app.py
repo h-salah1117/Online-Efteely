@@ -91,44 +91,57 @@ html, body, [class*="css"] {
     gap: 0.5rem;
 }
 
-/* ── Chat messages ── */
-[data-testid="stChatMessage"] {
-    border-radius: var(--radius) !important;
-    margin-bottom: 0.75rem !important;
-    padding: 1rem 1.25rem !important;
-    box-shadow: var(--shadow) !important;
-    border: 1px solid transparent !important;
-    animation: fadeUp 0.3s ease both;
-}
-
+/* ── Chat messages — nuclear override ── */
 @keyframes fadeUp {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: translateY(0); }
 }
 
-/* User bubble */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) {
-    background: linear-gradient(135deg, var(--green-mid), var(--green-accent)) !important;
-    border-color: var(--green-light) !important;
-    color: #ffffff !important;
+/* Base container */
+[data-testid="stChatMessage"] {
+    border-radius: var(--radius) !important;
+    margin-bottom: 0.75rem !important;
+    padding: 1rem 1.25rem !important;
+    box-shadow: var(--shadow) !important;
+    border: 1px solid var(--border) !important;
+    animation: fadeUp 0.3s ease both;
+    background: #ffffff !important;
 }
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-user"]) p {
-    color: #ffffff !important;
+
+/* All text inside ANY chat bubble: dark by default */
+[data-testid="stChatMessage"] *,
+[data-testid="stChatMessage"] p,
+[data-testid="stChatMessage"] span,
+[data-testid="stChatMessage"] div {
+    color: var(--text-main) !important;
+    background: transparent !important;
+}
+
+/* User bubble — green pill on the left side via left border */
+[data-testid="stChatMessage"][data-testid*="user"],
+div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-user"]) {
+    background: #f0faf5 !important;
+    border-left: 4px solid var(--green-accent) !important;
 }
 
 /* Assistant bubble */
-[data-testid="stChatMessage"]:has([data-testid="chatAvatarIcon-assistant"]) {
-    background: #ffffff !important;
-    border-color: var(--border) !important;
-    color: var(--text-main) !important;
+div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assistant"]) {
+    background: #fffdf7 !important;
+    border-left: 4px solid var(--gold) !important;
 }
 
 /* Avatar icons */
+[data-testid="chatAvatarIcon-user"] svg,
 [data-testid="chatAvatarIcon-user"] {
-    background: var(--green-light) !important;
+    background: var(--green-accent) !important;
+    color: #fff !important;
+    fill: #fff !important;
 }
+[data-testid="chatAvatarIcon-assistant"] svg,
 [data-testid="chatAvatarIcon-assistant"] {
     background: var(--gold) !important;
+    color: #fff !important;
+    fill: #fff !important;
 }
 
 /* ── Chat input ── */

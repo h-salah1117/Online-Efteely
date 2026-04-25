@@ -29,7 +29,7 @@ def load_rag():
             )
         with open(DOWNLOAD_MARKER, "w") as f:
             f.write("done")
-        st.success("✅ تم تحميل قاعدة البيانات!")
+        st.toast("✅ تم تحميل قاعدة البيانات!", icon="📚")
 
     embeddings = HuggingFaceEmbeddings(
         model_name="intfloat/multilingual-e5-base",
@@ -44,7 +44,7 @@ def load_rag():
 
     count = vectorstore._collection.count()
     retriever = vectorstore.as_retriever(search_kwargs={"k": 5})
-    st.info(f"✅ تم تحميل {count} فتوى")
+    st.toast(f"✅ تم تحميل {count} فتوى", icon="📚")    
     return retriever
 
 try:
@@ -59,14 +59,21 @@ llm = ChatGroq(
     groq_api_key=st.secrets["GROQ_API_KEY"]
 )
 
-prompt_template = PromptTemplate.from_template("""أنت مفتي وخبير شرعي موثوق. أجب على سؤال المستخدم بالعربية الفصحى الواضحة.
-استخدم فقط الفتاوى المقدمة في السياق. كن موجزاً ومحترماً.
-إذا لم يكن السؤال في السياق، قل ذلك بأدب.
+chat_history_text = ""
+for msg in st.session_state.messages[-5:]: 
+    role = "المستخدم" if msg["role"] == "user" else "البوت"
+    chat_history_text += f"{role}: {msg['content']}\n"
 
-السياق:
+prompt_template = PromptTemplate.from_template("""أنت مفتي وخبير شرعي موثوق. أجب على سؤال المستخدم بالعربية الفصحى الواضحة.
+استخدم الفتاوى المقدمة في السياق كمرجع أساسي، وتذكر سياق المحادثة السابقة لتكون إجابتك متسقة.
+
+سياق المحادثة السابقة:
+{chat_history}
+
+الفتاوى المتعلقة بالسؤال الحالي:
 {context}
 
-السؤال: {question}
+السؤال الحالي: {question}
 
 الإجابة:""")
 
@@ -88,7 +95,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا..."):
             context = "\n\n---\n\n".join([doc.page_content for doc in docs])
 
             chain = prompt_template | llm | StrOutputParser()
-            response = chain.invoke({"context": context, "question": prompt})
+            response = chain.invoke({"context": context, "question": prompt, "chat_history": chat_history_text})
 
             st.markdown(response)
 

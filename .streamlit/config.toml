@@ -1,0 +1,7 @@
+# The UI is designed for a light background; don't follow the viewer's dark mode
+[theme]
+base = "light"
+primaryColor = "#1e7a4a"
+backgroundColor = "#f7f3eb"
+textColor = "#1a1a1a"
+font = "sans serif"

@@ -151,7 +151,28 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
     font-family: 'Cairo', sans-serif !important;
     font-size: 1rem !important;
     color: var(--text-main) !important;
+    -webkit-text-fill-color: var(--text-main) !important;
+    caret-color: var(--green-accent) !important;
     direction: rtl !important;
+}
+/* Keep the input light even when the browser/OS is in dark mode */
+[data-testid="stChatInput"] > div,
+[data-testid="stChatInput"] textarea {
+    background: #ffffff !important;
+}
+[data-testid="stChatInput"] textarea::placeholder {
+    color: var(--text-muted) !important;
+    -webkit-text-fill-color: var(--text-muted) !important;
+    opacity: 1 !important;
+}
+[data-testid="stChatInput"] button svg {
+    fill: var(--green-accent) !important;
+    color: var(--green-accent) !important;
+}
+[data-testid="stBottom"],
+[data-testid="stBottom"] > div,
+[data-testid="stBottomBlockContainer"] {
+    background: var(--cream) !important;
 }
 
 [data-testid="stSpinner"] {

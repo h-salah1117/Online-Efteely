@@ -1,0 +1,36 @@
+name: Sync to Hugging Face Space
+
+# Copies the current files to the Space as a single commit (instead of pushing
+# git history), so old binary blobs in history never reach the Space.
+# Requires a repo secret HF_TOKEN with write access to the Space.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: src
+
+      - name: Push snapshot to the Space
+        env:
+          HF_TOKEN: ${{ secrets.HF_TOKEN }}
+          SPACE: H-Salah/online-efteely
+        run: |
+          git clone "https://H-Salah:${HF_TOKEN}@huggingface.co/spaces/${SPACE}" space
+          rsync -a --delete --exclude .git --exclude .github src/ space/
+          cd space
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Space is already up to date"
+            exit 0
+          fi
+          git commit -m "Sync from GitHub ${GITHUB_SHA::7}: $(git -C ../src log -1 --format=%s)"
+          git push

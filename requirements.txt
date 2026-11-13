@@ -7,3 +7,4 @@ langchain-groq
 chromadb
 sentence-transformers
 huggingface-hub
+langsmith

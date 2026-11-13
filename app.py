@@ -1,5 +1,16 @@
 import streamlit as st
 import os
+
+# LangSmith reads its config from environment variables, while this app keeps
+# keys in st.secrets. Copy them over before any langchain import so tracing
+# picks them up. Existing env vars (e.g. HF Space secrets) are left untouched.
+for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"):
+    try:
+        if _k not in os.environ and _k in st.secrets:
+            os.environ[_k] = str(st.secrets[_k])
+    except Exception:
+        break  # no secrets.toml at all — nothing to copy
+
 from huggingface_hub import snapshot_download
 from langchain_chroma import Chroma
 from langchain_huggingface import HuggingFaceEmbeddings
@@ -7,6 +18,7 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
+from langsmith import traceable
 
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
@@ -278,6 +290,7 @@ except Exception as e:
     st.stop()
 
 
+@traceable(name="search_fatwas", run_type="retriever")
 def search_fatwas(query):
     """Return up to TOP_FATWAS fatwas, each with its retrieved chunks merged.
 

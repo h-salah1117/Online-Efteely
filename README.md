@@ -8,7 +8,7 @@ sdk_version: 1.56.0
 app_file: app.py
 pinned: false
 license: mit
-short_description: RAG assistant that answers Islamic questions with cited fatwas
+short_description: RAG chatbot for Islamic questions with cited fatwas
 ---
 
 # 🕌 Online Efteely

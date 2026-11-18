@@ -18,9 +18,7 @@ short_description: RAG assistant that answers Islamic questions with cited fatwa
 <a href="https://huggingface.co/spaces/H-Salah/online-efteely"><img src="https://img.shields.io/badge/Try_it_live-FFD21E?style=for-the-badge&logo=huggingface&logoColor=black" alt="Try it live on Hugging Face"></a>
 <a href="https://www.kaggle.com/datasets/hazemmosalah/50k-islamic-fatwa-q-and-a-dataset-arabic"><img src="https://img.shields.io/badge/Dataset-20BEFF?style=for-the-badge&logo=kaggle&logoColor=white" alt="Dataset on Kaggle"></a>
 
-<!-- Replace with a real recording of the app:
 <img src="assets/demo.gif" width="720" alt="Efteely answering a question with cited sources">
--->
 
 ## The problem
 

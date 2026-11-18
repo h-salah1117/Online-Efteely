@@ -23,7 +23,7 @@ jobs:
           SPACE: H-Salah/online-efteely
         run: |
           git clone "https://H-Salah:${HF_TOKEN}@huggingface.co/spaces/${SPACE}" space
-          rsync -a --delete --exclude .git --exclude .github src/ space/
+          rsync -a --delete --exclude .git --exclude .github --exclude assets src/ space/
           cd space
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"

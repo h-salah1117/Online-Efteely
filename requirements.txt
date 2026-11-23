@@ -1,10 +1,18 @@
-streamlit
-langchain
-langchain-core
-langchain-chroma
-langchain-huggingface
-langchain-groq
-chromadb
-sentence-transformers
-huggingface-hub
-langsmith
+# --- App runtime (app.py, rag_core.py) ---
+streamlit>=1.55.0
+langchain>=1.2.10
+langchain-core>=1.2.16
+langchain-chroma>=1.1.0
+langchain-huggingface>=1.2.0
+langchain-groq>=1.0.0
+chromadb>=1.5.5
+sentence-transformers>=5.2.3
+transformers>=5.2.0
+torch>=2.10.0
+huggingface-hub>=1.5.0
+langsmith>=0.7.7
+
+# --- Index building (notebook/OFCB.ipynb) ---
+langchain-text-splitters>=1.1.1
+pandas>=2.3.3
+tqdm>=4.67.1

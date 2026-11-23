@@ -1,9 +1,6 @@
 import streamlit as st
 import os
 
-# LangSmith reads its config from environment variables, while this app keeps
-# keys in st.secrets. Copy them over before any langchain import so tracing
-# picks them up. Existing env vars (e.g. HF Space secrets) are left untouched.
 for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"):
     try:
         if _k not in os.environ and _k in st.secrets:
@@ -11,15 +8,15 @@ for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"):
     except Exception:
         break  # no secrets.toml at all — nothing to copy
 
-from huggingface_hub import snapshot_download
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
-from langsmith import traceable
 
+from rag_core import (
+    load_rag, search_fatwas, format_context,
+    ANSWER_MODEL, ROUTER_MODEL,
+)
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
 # ── Custom CSS ──────────────────────────────────────────────────────────────
@@ -239,86 +236,17 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
 </div>
 """, unsafe_allow_html=True)
 
-# ── Constants ────────────────────────────────────────────────────────────────
-CHROMA_PATH     = "/tmp/chroma_db"
-CHROMA_SUBDIR   = os.path.join(CHROMA_PATH, "chroma_db")
-
-# Bump when the index on HF is rebuilt, so a stale /tmp copy is re-downloaded
-INDEX_VERSION   = "bge-m3-chunks-v1"
-DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, f".download_complete_{INDEX_VERSION}")
-
-# Must match the indexing notebook
-EMBEDDING_MODEL = "BAAI/bge-m3"
-
-ANSWER_MODEL    = "openai/gpt-oss-120b"
-ROUTER_MODEL    = "llama-3.1-8b-instant"   # small & fast; falls back to ANSWER_MODEL on error
-
-RETRIEVE_K      = 15     # chunks fetched from Chroma
-TOP_FATWAS      = 5      # distinct fatwas passed to the LLM
-MAX_DISTANCE    = 0.5    # cosine distance; chunks farther than this are ignored (tune with the notebook's sanity check)
-
 # ── Load RAG ─────────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
-def load_rag():
-    if not os.path.exists(DOWNLOAD_MARKER):
-        os.makedirs(CHROMA_PATH, exist_ok=True)
-        snapshot_download(
-            repo_id="H-Salah/online-efteely-chroma",
-            repo_type="dataset",
-            local_dir=CHROMA_PATH,
-            allow_patterns=["chroma_db/*"],
-            token=st.secrets.get("HF_TOKEN", None)
-        )
-        with open(DOWNLOAD_MARKER, "w") as f:
-            f.write("done")
-
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
-    )
-    return Chroma(
-        persist_directory=CHROMA_SUBDIR,
-        embedding_function=embeddings
-    )
+def get_vectorstore():
+    return load_rag()
 
 try:
     with st.spinner("جاري تحميل محرك البحث الفقهي…"):
-        vectorstore = load_rag()
+        vectorstore = get_vectorstore()
 except Exception as e:
     st.error(f"❌ خطأ في تشغيل النظام: {e}")
     st.stop()
-
-
-@traceable(name="search_fatwas", run_type="retriever")
-def search_fatwas(query):
-    """Return up to TOP_FATWAS fatwas, each with its retrieved chunks merged.
-
-    The index stores several chunks per fatwa, so results are grouped by link
-    (keeping best-match order) and chunks beyond MAX_DISTANCE are dropped.
-    """
-    results = vectorstore.similarity_search_with_score(query, k=RETRIEVE_K)
-    fatwas = {}
-    for doc, distance in results:
-        if distance > MAX_DISTANCE:
-            continue
-        link = (doc.metadata.get("link") or doc.metadata.get("source") or "").strip()
-        key  = link or doc.page_content[:100]
-        if key not in fatwas:
-            if len(fatwas) == TOP_FATWAS:
-                continue
-            fatwas[key] = {"title": doc.metadata.get("title", ""), "link": link, "chunks": []}
-        fatwas[key]["chunks"].append(doc.page_content)
-    return list(fatwas.values())
-
-
-def format_context(fatwas):
-    if not fatwas:
-        return "لا توجد فتاوى ذات صلة بهذا السؤال."
-    blocks = []
-    for i, f in enumerate(fatwas, 1):
-        blocks.append(f"[{i}] {f['title']}\n" + "\n...\n".join(f["chunks"]))
-    return "\n\n---\n\n".join(blocks)
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
 # FIX 1: validate secret exists before crashing with an unclear KeyError
@@ -408,7 +336,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
 
         if use_search:
             with st.spinner("جاري مراجعة الفتاوى…"):
-                fatwas  = search_fatwas(search_query)
+                fatwas  = search_fatwas(vectorstore, search_query)
                 context = format_context(fatwas)
         else:
             context = "لا يوجد سياق فقهي محدد لهذه الرسالة."

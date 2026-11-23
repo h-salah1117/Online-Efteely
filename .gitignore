@@ -7,3 +7,4 @@ online-efteely0-chroma
 .env
 *.pkl
 .streamlit/secrets.toml
+online-efteely-chroma/ 

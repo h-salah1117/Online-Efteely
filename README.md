@@ -87,7 +87,9 @@ streamlit run app.py
 
 The first start downloads the Chroma index and the bge-m3 model, so it takes a few minutes.
 
-## Key settings (in `app.py`)
+The index is downloaded to `/tmp/chroma_db` by default. If you already have it locally, set `CHROMA_PATH` to the folder that contains `chroma_db/` and create an empty `.download_complete_bge-m3-chunks-v1` file in it to skip the download.
+
+## Key settings (in `rag_core.py`)
 
 | Setting | Value | Meaning |
 |:--|:--|:--|
@@ -99,7 +101,8 @@ The first start downloads the Chroma index and the bge-m3 model, so it takes a f
 ## Project structure
 
 ```
-├── app.py                         # Streamlit app: router, retrieval, answer, sources
+├── app.py                         # Streamlit UI: chat, router, answer, sources
+├── rag_core.py                    # Index download, embeddings, retrieval, settings
 ├── notebook/OFCB.ipynb            # Indexing pipeline (chunk → embed → upload)
 ├── requirements.txt
 ├── .streamlit/config.toml

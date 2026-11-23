@@ -1,7 +1,7 @@
 import streamlit as st
-import os
+import os , re
 
-for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"):
+for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT","HF_TOKEN"):
     try:
         if _k not in os.environ and _k in st.secrets:
             os.environ[_k] = str(st.secrets[_k])
@@ -17,6 +17,7 @@ from rag_core import (
     load_rag, search_fatwas, format_context,
     ANSWER_MODEL, ROUTER_MODEL,
 )
+
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
 # ── Custom CSS ──────────────────────────────────────────────────────────────
@@ -287,10 +288,23 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
     st.toast("✅ إفتيلي جاهز للرد على استفساراتكم", icon="🕌")
 
+def show_sources(fatwas):
+    with st.expander("📚 المصادر والمراجع"):
+        for i, f in enumerate(fatwas, 1):
+            title = f["title"] or "رابط الفتوى"
+            if f["link"]:
+                st.markdown(f"[{i}] [{title} ↗]({f['link']})")
+            else:
+                st.markdown(f"[{i}] {title}")
+
+
 # ── Render history ────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        if msg.get("fatwas"):
+            show_sources(msg["fatwas"])
+
 
 # ── Handle new input ──────────────────────────────────────────────────────────
 if prompt := st.chat_input("اكتب سؤالك هنا…"):
@@ -302,7 +316,8 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
     # so it isn't repeated alongside {question}
     past = st.session_state.messages[:-1][-6:]
     history_messages = [
-        HumanMessage(m["content"]) if m["role"] == "user" else AIMessage(m["content"])
+        HumanMessage(m["content"]) if m["role"] == "user"
+        else AIMessage(re.sub(r"\[\d+\]", "", m["content"]))
         for m in past
     ]
     full_history = "\n".join(
@@ -319,8 +334,12 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
             "SEARCH: <the question rewritten in Arabic as a standalone question, using the history to resolve references>\n"
             "Otherwise (greeting, thanks, small talk), reply exactly: CHAT"
         )
-        router_result = router_llm.invoke(router_prompt).content.strip()
-
+        try:
+            router_result = router_llm.invoke(router_prompt).content.strip()
+        except Exception as e:
+            st.error(f"❌ خطأ في تصنيف الرسالة: {e}")
+            st.session_state.messages.pop()
+            st.stop()
         fatwas = []
 
         # Fallback: if the router output is malformed, anything that looks
@@ -331,7 +350,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
         elif router_result.upper().startswith("CHAT"):
             use_search   = False
         else:
-            use_search   = len(prompt.split()) > 3
+            use_search   = True
             search_query = prompt
 
         if use_search:
@@ -341,21 +360,22 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
         else:
             context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
 
-        response = st.write_stream(chain.stream({
-            "context":  context,
-            "question": prompt,
-            "history":  history_messages
-        }))
+        try:
+            response = st.write_stream(chain.stream({
+                "context":  context,
+                "question": prompt,
+                "history":  history_messages
+            }))
+        except Exception as e:
+            st.session_state.messages.pop()
+            st.error(f"❌ خطأ في توليد الإجابة: {e}")
+            st.stop()
 
-        # Sources expander — numbered to match the [n] citations in the answer
+
+
         if fatwas:
-            with st.expander("📚 المصادر والمراجع"):
-                for i, f in enumerate(fatwas, 1):
-                    title = f["title"] or "رابط الفتوى"
-                    if f["link"]:
-                        st.markdown(f"[{i}] [{title} ↗]({f['link']})")
-                    else:
-                        st.markdown(f"[{i}] {title}")
+            show_sources(fatwas)
 
-    # FIX 4: removed st.rerun() — Streamlit reruns automatically after each interaction
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.session_state.messages.append(
+        {"role": "assistant", "content": response, "fatwas": fatwas}
+    )

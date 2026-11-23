@@ -7,7 +7,7 @@ from langsmith import traceable
 
 
 # ── Constants ────────────────────────────────────────────────────────────────
-CHROMA_PATH     = "/tmp/chroma_db"
+CHROMA_PATH = os.getenv("CHROMA_PATH", "/tmp/chroma_db")
 CHROMA_SUBDIR   = os.path.join(CHROMA_PATH, "chroma_db")
 
 # Bump when the index on HF is rebuilt, so a stale /tmp copy is re-downloaded

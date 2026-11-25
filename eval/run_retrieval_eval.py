@@ -1,27 +1,29 @@
-import os, re, sys
+import os, sys
 import pandas as pd
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
 from rag_core import load_rag, search_fatwas
+from eval.utils import link_to_id
 
 df = pd.read_csv(os.path.join(ROOT, "eval", "golden_set.csv"))
 
 vs = load_rag()
 
-PATTERNS = {
-    "islamweb": r"islamweb\.net/.*?/fatwa/(\d+)",
-    "binbaz":   r"binbaz\.org\.sa/fatwas/(\d+)",
-    "islamqa":  r"islamqa\.info/.*?/answers/(\d+)",
-}
+def split_ids(value):
+    return value.split("|") if isinstance(value, str) else []
 
-def link_to_id(link):
-    for site, pattern in PATTERNS.items():
-        m = re.search(pattern, link or "")
-        if m:
-            return f"{site}_{m.group(1)}"
-    return None
+
+def hit_metrics(retrieved, gold, suffix):
+    """hit@1 / hit@5 / MRR against a set of acceptable fatwa ids."""
+    first_hit = next((i for i, r in enumerate(retrieved, 1) if r in gold), None)
+    return {
+        f"hit@1{suffix}": int(bool(retrieved) and retrieved[0] in gold),
+        f"hit@5{suffix}": int(first_hit is not None),
+        f"mrr{suffix}":   1 / first_hit if first_hit else 0,
+    }
+
 
 rows = []
 for row in df.itertuples():
@@ -37,23 +39,26 @@ for row in df.itertuples():
     if row.question_type == "no_answer":
         result["no_answer_ok"] = int(len(fatwas) == 0)
     else:
-        gold = row.source_id.split("|")
-        first_hit = next((i for i, r in enumerate(retrieved, 1) if r in gold), None)
+        original = split_ids(row.source_id_original)   # the single labelled fatwa(s)
+        accepted = split_ids(row.source_id)            # + alternatives accepted after manual review
 
-        result["hit@1"]    = int(bool(retrieved) and retrieved[0] in gold)
-        result["hit@5"]    = int(first_hit is not None)
-        result["mrr"]      = 1 / first_hit if first_hit else 0
-        result["recall@5"] = len(set(retrieved) & set(gold)) / len(gold)
+        result.update(hit_metrics(retrieved, original, "_strict"))
+        result.update(hit_metrics(retrieved, accepted, ""))
+        # recall uses the original ids: alternatives are "any of", not "all required"
+        result["recall@5"] = len(set(retrieved) & set(original)) / len(original)
 
     rows.append(result)
 
 res = pd.DataFrame(rows)
-metrics = ["hit@1", "hit@5", "mrr", "recall@5", "no_answer_ok"]
+metrics = ["hit@1_strict", "hit@5_strict", "mrr_strict",
+           "hit@1", "hit@5", "mrr", "recall@5", "no_answer_ok"]
 
+pd.set_option("display.width", 200)
+print("strict = original label only | lenient (no suffix) = + accepted alternatives\n")
 print(res.groupby("question_type")[metrics].mean().round(2))
 print("\nOverall:")
 print(res[metrics].mean().round(2))
 
 out = os.path.join(ROOT, "eval", "retrieval_results.csv")
 res.to_csv(out, index=False, encoding="utf-8-sig")
-print(f"\nSaved → {out}")
+print(f"\nSaved -> {out}")

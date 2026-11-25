@@ -9,12 +9,12 @@ for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT","HF_TOK
         break  # no secrets.toml at all — nothing to copy
 
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
 
 from rag_core import (
     load_rag, search_fatwas, format_context,
+    build_answer_prompt, build_router_prompt, parse_router_output,
     ANSWER_MODEL, ROUTER_MODEL,
 )
 
@@ -267,20 +267,7 @@ router_llm = ChatGroq(
 ).with_fallbacks([llm])
 
 # FIX 2: build prompt chain once at startup, not on every request
-prompt_template = ChatPromptTemplate.from_messages([
-    ("system",
-     'أنت "إفتيلي"، مساعد شرعي ودود ومتخصص.\n'
-     "قواعد الإجابة:\n"
-     "- أجب فقط بناءً على الفتاوى المرفقة أدناه، ولا تضف أحكامًا أو أدلة من عندك.\n"
-     "- ضع رقم الفتوى بين قوسين مربعين مثل [1] بعد كل معلومة مأخوذة منها.\n"
-     "- إذا لم تجد في الفتاوى ما يجيب عن السؤال، فقل بوضوح إنك لم تجد فتوى في هذه المسألة، "
-     "وانصح السائل بالرجوع إلى أهل العلم، ولا تخمّن.\n"
-     "- إذا كانت الرسالة تحية أو شكرًا أو كلامًا عامًا، فرد بلطف واختصار.\n"
-     "- أجب بنفس لغة السائل وأسلوبه (فصحى أو عامية).\n\n"
-     "الفتاوى المتاحة:\n{context}"),
-    MessagesPlaceholder("history"),
-    ("human", "{question}"),
-])
+prompt_template = build_answer_prompt()
 chain = prompt_template | llm | StrOutputParser()
 
 # ── Session state ─────────────────────────────────────────────────────────────
@@ -327,13 +314,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
     with st.chat_message("assistant"):
         # Intent detection + standalone question rewrite in a single call,
         # so retrieval embeds only the question instead of the whole history
-        router_prompt = (
-            f"Conversation history:\n{full_history}\n\n"
-            f"Last user message: {prompt}\n\n"
-            "If the last message is a religious/fiqh question, reply exactly:\n"
-            "SEARCH: <the question rewritten in Arabic as a standalone question, using the history to resolve references>\n"
-            "Otherwise (greeting, thanks, small talk), reply exactly: CHAT"
-        )
+        router_prompt = build_router_prompt(full_history, prompt)
         try:
             router_result = router_llm.invoke(router_prompt).content.strip()
         except Exception as e:
@@ -341,17 +322,7 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
             st.session_state.messages.pop()
             st.stop()
         fatwas = []
-
-        # Fallback: if the router output is malformed, anything that looks
-        # like a question defaults to search
-        if router_result.upper().startswith("SEARCH"):
-            use_search   = True
-            search_query = router_result.split(":", 1)[-1].strip() or prompt
-        elif router_result.upper().startswith("CHAT"):
-            use_search   = False
-        else:
-            use_search   = True
-            search_query = prompt
+        use_search, search_query = parse_router_output(router_result, prompt)
 
         if use_search:
             with st.spinner("جاري مراجعة الفتاوى…"):

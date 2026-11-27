@@ -3,7 +3,8 @@ __pycache__/
 *.pyc
 data/
 notebook/chroma_db
-online-efteely0-chroma
+
 .env
 *.pkl
 .streamlit/secrets.toml
+online-efteely-chroma/ 

@@ -36,12 +36,12 @@ People search for religious rulings and get either generic chatbot answers with 
 
 ```mermaid
 flowchart LR
-    U[User question] --> R{Router LLM<br/>llama-3.1-8b-instant}
+    U[User question] --> R{Router LLM<br/>gpt-oss-20b}
     H[(Last 6 turns<br/>of chat history)] --> R
     R -- "CHAT" --> G
     R -- "SEARCH: standalone question" --> E[bge-m3<br/>embedding]
     E --> V[(ChromaDB<br/>fatwa chunks)]
-    V --> F[Top 15 chunks<br/>→ drop distance > 0.5<br/>→ group into top 5 fatwas]
+    V --> F[Top 15 chunks<br/>→ drop distance > 0.40<br/>→ group into top 5 fatwas]
     F --> G[Answer LLM<br/>gpt-oss-120b via Groq]
     G --> A[Streamed answer<br/>+ numbered sources]
 ```
@@ -57,7 +57,7 @@ flowchart LR
 | Data | 50K+ fatwas scraped from Bin Baz, IslamQA and IslamWeb (BeautifulSoup), cleaned with pandas |
 | Embeddings | `BAAI/bge-m3` (sentence-transformers), normalized, cosine distance |
 | Vector store | ChromaDB, hosted as a Hugging Face dataset |
-| LLMs | Groq: `gpt-oss-120b` (answers), `llama-3.1-8b-instant` (routing, with fallback to the answer model) |
+| LLMs | Groq: `gpt-oss-120b` (answers), `gpt-oss-20b` (routing, with fallback to the answer model) |
 | Orchestration | LangChain (prompt templates, streaming, fallbacks) |
 | Observability | LangSmith tracing of retrieval and LLM calls |
 | App & deploy | Streamlit on Hugging Face Spaces, synced from GitHub by a GitHub Action |
@@ -87,20 +87,24 @@ streamlit run app.py
 
 The first start downloads the Chroma index and the bge-m3 model, so it takes a few minutes.
 
-## Key settings (in `app.py`)
+The index is downloaded to `/tmp/chroma_db` by default. If you already have it locally, set `CHROMA_PATH` to the folder that contains `chroma_db/` and create an empty `.download_complete_bge-m3-chunks-v1` file in it to skip the download.
+
+## Key settings (in `rag_core.py`)
 
 | Setting | Value | Meaning |
 |:--|:--|:--|
 | `RETRIEVE_K` | 15 | chunks fetched per question |
 | `TOP_FATWAS` | 5 | distinct fatwas passed to the LLM |
-| `MAX_DISTANCE` | 0.5 | chunks farther than this are ignored |
+| `MAX_DISTANCE` | 0.40 | chunks farther than this are ignored (picked with `eval/distance_analysis.py`) |
 | `INDEX_VERSION` | `bge-m3-chunks-v1` | bump to force a re-download after re-indexing |
 
 ## Project structure
 
 ```
-├── app.py                         # Streamlit app: router, retrieval, answer, sources
+├── app.py                         # Streamlit UI: chat, router, answer, sources
+├── rag_core.py                    # Index download, embeddings, retrieval, prompts, settings
 ├── notebook/OFCB.ipynb            # Indexing pipeline (chunk → embed → upload)
+├── eval/                          # Golden set, retrieval + LLM-judge answer eval (see eval/README.md)
 ├── requirements.txt
 ├── .streamlit/config.toml
 └── .github/workflows/
@@ -120,11 +124,24 @@ The first start downloads the Chroma index and the bge-m3 model, so it takes a f
 
 ## Evaluation
 
-🚧 **In progress.** Right now, retrieval is only sanity-checked in the indexing notebook: three test questions, one of them deliberately unrelated. Next up:
+Golden set v1: **79 questions**: 29 in Egyptian dialect, 14 in MSA, 10 that need two fatwas, 6 near-copies of fatwa titles, and 20 with no answer in the corpus. Questions were drafted by an LLM from random fatwas, checked by a second model family, and reviewed by hand. Full method, scripts and per-question results are in [eval/README.md](eval/README.md).
 
-- a held-out set of reworded questions to measure retrieval hit@5 and MRR
-- a comparison of embedding and retrieval setups (e5 vs bge-m3 vs hybrid BM25 + reranker)
-- checks for answer faithfulness and citation accuracy
+| | metric | result |
+|:--|:--|:--|
+| **Retrieval** (79 q) | hit@5, all 59 answerable questions | **83%** (strict labels: 80%) |
+| | hit@5, Egyptian-dialect questions (29) | **79%** |
+| | MRR | **0.68** |
+| | out-of-corpus questions correctly rejected | **16/20** (4/20 at the old `MAX_DISTANCE=0.5`) |
+| **Answers** (LLM judge, first 20 q) | correctness / faithfulness / citations (1–5) | **4.59 / 4.94 / 4.76** |
+| | pass rate (correctness ≥ 4 and faithfulness ≥ 4) | **94%** |
+| | says "no fatwa found" instead of guessing | **3/3** |
+
+What the eval changed:
+- `MAX_DISTANCE` went from 0.5 to **0.40**, chosen from a threshold sweep and re-checked on the larger set. It costs 2 points of hit@5 and rejects 4× more out-of-corpus questions.
+- It caught a dead router model (`llama-3.1-8b-instant` was removed from Groq, so every request was silently falling back to the big model). It is replaced with `gpt-oss-20b`.
+- It showed where dense retrieval breaks: dialect questions where the embedding matches the general topic but misses the specific point. It also showed that a distance threshold alone can't fully separate "no answer" from "hard answer".
+
+⚠️ Early numbers, not a benchmark: hit@5 has a margin of about ±10 points at this size, and the answer eval still has to run on all 79 questions. Next: hybrid BM25 + a reranker, compared against dense retrieval on the same questions.
 
 ## Disclaimer
 

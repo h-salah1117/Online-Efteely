@@ -1,24 +1,22 @@
 import streamlit as st
-import os
+import os , re
 
-# LangSmith reads its config from environment variables, while this app keeps
-# keys in st.secrets. Copy them over before any langchain import so tracing
-# picks them up. Existing env vars (e.g. HF Space secrets) are left untouched.
-for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT"):
+for _k in ("LANGSMITH_API_KEY", "LANGSMITH_TRACING", "LANGSMITH_PROJECT","HF_TOKEN"):
     try:
         if _k not in os.environ and _k in st.secrets:
             os.environ[_k] = str(st.secrets[_k])
     except Exception:
         break  # no secrets.toml at all — nothing to copy
 
-from huggingface_hub import snapshot_download
-from langchain_chroma import Chroma
-from langchain_huggingface import HuggingFaceEmbeddings
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_core.output_parsers import StrOutputParser
-from langsmith import traceable
+
+from rag_core import (
+    load_rag, search_fatwas, format_context,
+    build_answer_prompt, build_router_prompt, parse_router_output,
+    ANSWER_MODEL, ROUTER_MODEL,
+)
 
 st.set_page_config(page_title="إفتيلي", page_icon="🕌", layout="centered")
 
@@ -239,86 +237,17 @@ div[data-testid="stChatMessage"]:has(> div > [data-testid="chatAvatarIcon-assist
 </div>
 """, unsafe_allow_html=True)
 
-# ── Constants ────────────────────────────────────────────────────────────────
-CHROMA_PATH     = "/tmp/chroma_db"
-CHROMA_SUBDIR   = os.path.join(CHROMA_PATH, "chroma_db")
-
-# Bump when the index on HF is rebuilt, so a stale /tmp copy is re-downloaded
-INDEX_VERSION   = "bge-m3-chunks-v1"
-DOWNLOAD_MARKER = os.path.join(CHROMA_PATH, f".download_complete_{INDEX_VERSION}")
-
-# Must match the indexing notebook
-EMBEDDING_MODEL = "BAAI/bge-m3"
-
-ANSWER_MODEL    = "openai/gpt-oss-120b"
-ROUTER_MODEL    = "llama-3.1-8b-instant"   # small & fast; falls back to ANSWER_MODEL on error
-
-RETRIEVE_K      = 15     # chunks fetched from Chroma
-TOP_FATWAS      = 5      # distinct fatwas passed to the LLM
-MAX_DISTANCE    = 0.5    # cosine distance; chunks farther than this are ignored (tune with the notebook's sanity check)
-
 # ── Load RAG ─────────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner=False)
-def load_rag():
-    if not os.path.exists(DOWNLOAD_MARKER):
-        os.makedirs(CHROMA_PATH, exist_ok=True)
-        snapshot_download(
-            repo_id="H-Salah/online-efteely-chroma",
-            repo_type="dataset",
-            local_dir=CHROMA_PATH,
-            allow_patterns=["chroma_db/*"],
-            token=st.secrets.get("HF_TOKEN", None)
-        )
-        with open(DOWNLOAD_MARKER, "w") as f:
-            f.write("done")
-
-    embeddings = HuggingFaceEmbeddings(
-        model_name=EMBEDDING_MODEL,
-        model_kwargs={"device": "cpu"},
-        encode_kwargs={"normalize_embeddings": True}
-    )
-    return Chroma(
-        persist_directory=CHROMA_SUBDIR,
-        embedding_function=embeddings
-    )
+def get_vectorstore():
+    return load_rag()
 
 try:
     with st.spinner("جاري تحميل محرك البحث الفقهي…"):
-        vectorstore = load_rag()
+        vectorstore = get_vectorstore()
 except Exception as e:
     st.error(f"❌ خطأ في تشغيل النظام: {e}")
     st.stop()
-
-
-@traceable(name="search_fatwas", run_type="retriever")
-def search_fatwas(query):
-    """Return up to TOP_FATWAS fatwas, each with its retrieved chunks merged.
-
-    The index stores several chunks per fatwa, so results are grouped by link
-    (keeping best-match order) and chunks beyond MAX_DISTANCE are dropped.
-    """
-    results = vectorstore.similarity_search_with_score(query, k=RETRIEVE_K)
-    fatwas = {}
-    for doc, distance in results:
-        if distance > MAX_DISTANCE:
-            continue
-        link = (doc.metadata.get("link") or doc.metadata.get("source") or "").strip()
-        key  = link or doc.page_content[:100]
-        if key not in fatwas:
-            if len(fatwas) == TOP_FATWAS:
-                continue
-            fatwas[key] = {"title": doc.metadata.get("title", ""), "link": link, "chunks": []}
-        fatwas[key]["chunks"].append(doc.page_content)
-    return list(fatwas.values())
-
-
-def format_context(fatwas):
-    if not fatwas:
-        return "لا توجد فتاوى ذات صلة بهذا السؤال."
-    blocks = []
-    for i, f in enumerate(fatwas, 1):
-        blocks.append(f"[{i}] {f['title']}\n" + "\n...\n".join(f["chunks"]))
-    return "\n\n---\n\n".join(blocks)
 
 # ── LLM ──────────────────────────────────────────────────────────────────────
 # FIX 1: validate secret exists before crashing with an unclear KeyError
@@ -338,20 +267,7 @@ router_llm = ChatGroq(
 ).with_fallbacks([llm])
 
 # FIX 2: build prompt chain once at startup, not on every request
-prompt_template = ChatPromptTemplate.from_messages([
-    ("system",
-     'أنت "إفتيلي"، مساعد شرعي ودود ومتخصص.\n'
-     "قواعد الإجابة:\n"
-     "- أجب فقط بناءً على الفتاوى المرفقة أدناه، ولا تضف أحكامًا أو أدلة من عندك.\n"
-     "- ضع رقم الفتوى بين قوسين مربعين مثل [1] بعد كل معلومة مأخوذة منها.\n"
-     "- إذا لم تجد في الفتاوى ما يجيب عن السؤال، فقل بوضوح إنك لم تجد فتوى في هذه المسألة، "
-     "وانصح السائل بالرجوع إلى أهل العلم، ولا تخمّن.\n"
-     "- إذا كانت الرسالة تحية أو شكرًا أو كلامًا عامًا، فرد بلطف واختصار.\n"
-     "- أجب بنفس لغة السائل وأسلوبه (فصحى أو عامية).\n\n"
-     "الفتاوى المتاحة:\n{context}"),
-    MessagesPlaceholder("history"),
-    ("human", "{question}"),
-])
+prompt_template = build_answer_prompt()
 chain = prompt_template | llm | StrOutputParser()
 
 # ── Session state ─────────────────────────────────────────────────────────────
@@ -359,10 +275,23 @@ if "messages" not in st.session_state:
     st.session_state.messages = []
     st.toast("✅ إفتيلي جاهز للرد على استفساراتكم", icon="🕌")
 
+def show_sources(fatwas):
+    with st.expander("📚 المصادر والمراجع"):
+        for i, f in enumerate(fatwas, 1):
+            title = f["title"] or "رابط الفتوى"
+            if f["link"]:
+                st.markdown(f"[{i}] [{title} ↗]({f['link']})")
+            else:
+                st.markdown(f"[{i}] {title}")
+
+
 # ── Render history ────────────────────────────────────────────────────────────
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
+        if msg.get("fatwas"):
+            show_sources(msg["fatwas"])
+
 
 # ── Handle new input ──────────────────────────────────────────────────────────
 if prompt := st.chat_input("اكتب سؤالك هنا…"):
@@ -374,7 +303,8 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
     # so it isn't repeated alongside {question}
     past = st.session_state.messages[:-1][-6:]
     history_messages = [
-        HumanMessage(m["content"]) if m["role"] == "user" else AIMessage(m["content"])
+        HumanMessage(m["content"]) if m["role"] == "user"
+        else AIMessage(re.sub(r"\[\d+\]", "", m["content"]))
         for m in past
     ]
     full_history = "\n".join(
@@ -384,50 +314,39 @@ if prompt := st.chat_input("اكتب سؤالك هنا…"):
     with st.chat_message("assistant"):
         # Intent detection + standalone question rewrite in a single call,
         # so retrieval embeds only the question instead of the whole history
-        router_prompt = (
-            f"Conversation history:\n{full_history}\n\n"
-            f"Last user message: {prompt}\n\n"
-            "If the last message is a religious/fiqh question, reply exactly:\n"
-            "SEARCH: <the question rewritten in Arabic as a standalone question, using the history to resolve references>\n"
-            "Otherwise (greeting, thanks, small talk), reply exactly: CHAT"
-        )
-        router_result = router_llm.invoke(router_prompt).content.strip()
-
+        router_prompt = build_router_prompt(full_history, prompt)
+        try:
+            router_result = router_llm.invoke(router_prompt).content.strip()
+        except Exception as e:
+            st.error(f"❌ خطأ في تصنيف الرسالة: {e}")
+            st.session_state.messages.pop()
+            st.stop()
         fatwas = []
-
-        # Fallback: if the router output is malformed, anything that looks
-        # like a question defaults to search
-        if router_result.upper().startswith("SEARCH"):
-            use_search   = True
-            search_query = router_result.split(":", 1)[-1].strip() or prompt
-        elif router_result.upper().startswith("CHAT"):
-            use_search   = False
-        else:
-            use_search   = len(prompt.split()) > 3
-            search_query = prompt
+        use_search, search_query = parse_router_output(router_result, prompt)
 
         if use_search:
             with st.spinner("جاري مراجعة الفتاوى…"):
-                fatwas  = search_fatwas(search_query)
+                fatwas  = search_fatwas(vectorstore, search_query)
                 context = format_context(fatwas)
         else:
             context = "لا يوجد سياق فقهي محدد لهذه الرسالة."
 
-        response = st.write_stream(chain.stream({
-            "context":  context,
-            "question": prompt,
-            "history":  history_messages
-        }))
+        try:
+            response = st.write_stream(chain.stream({
+                "context":  context,
+                "question": prompt,
+                "history":  history_messages
+            }))
+        except Exception as e:
+            st.session_state.messages.pop()
+            st.error(f"❌ خطأ في توليد الإجابة: {e}")
+            st.stop()
 
-        # Sources expander — numbered to match the [n] citations in the answer
+
+
         if fatwas:
-            with st.expander("📚 المصادر والمراجع"):
-                for i, f in enumerate(fatwas, 1):
-                    title = f["title"] or "رابط الفتوى"
-                    if f["link"]:
-                        st.markdown(f"[{i}] [{title} ↗]({f['link']})")
-                    else:
-                        st.markdown(f"[{i}] {title}")
+            show_sources(fatwas)
 
-    # FIX 4: removed st.rerun() — Streamlit reruns automatically after each interaction
-    st.session_state.messages.append({"role": "assistant", "content": response})
+    st.session_state.messages.append(
+        {"role": "assistant", "content": response, "fatwas": fatwas}
+    )
